@@ -1,0 +1,270 @@
+/* ================================================
+   CUTE TASK CARD with Adorable Checkbox
+   ================================================ */
+
+.task-card-cute {
+  background: white;
+  border: 2px solid #E8E6E1;
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.task-card-cute:hover {
+  border-color: #D97757;
+  box-shadow: 
+    0 8px 24px rgba(217, 119, 87, 0.12),
+    0 4px 8px rgba(45, 45, 45, 0.05);
+  transform: translateY(-2px);
+}
+
+.task-main-cute {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* ================================================
+   CUTE CHECKBOX - The Star of the Show!
+   ================================================ */
+
+.task-checkbox-cute {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #D97757;
+  background: white;
+  border-radius: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(217, 119, 87, 0.1);
+}
+
+.task-checkbox-cute:hover {
+  transform: scale(1.1) rotate(-5deg);
+  border-color: #E8B86D;
+  box-shadow: 0 4px 12px rgba(217, 119, 87, 0.2);
+}
+
+.task-checkbox-cute:active {
+  transform: scale(0.95);
+}
+
+.task-checkbox-cute.checked {
+  background: linear-gradient(135deg, #D97757 0%, #E8B86D 100%);
+  border-color: #D97757;
+  animation: checkBounce 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1); }
+}
+
+.checkbox-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkmark-cute {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  animation: checkmarkPop 0.3s ease;
+}
+
+@keyframes checkmarkPop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-45deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* ================================================
+   Task Content
+   ================================================ */
+
+.task-content-cute {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title-cute {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2D2D2D;
+  margin-bottom: 6px;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+}
+
+.task-title-cute.completed {
+  color: #9B9690;
+}
+
+.task-description-cute {
+  font-size: 14px;
+  color: #9B9690;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.task-deadline-cute {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #D97757;
+  background: rgba(217, 119, 87, 0.08);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.task-subtasks-toggle-cute {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  background: rgba(122, 155, 118, 0.08);
+  color: #7A9B76;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-subtasks-toggle-cute:hover {
+  background: rgba(122, 155, 118, 0.15);
+  transform: translateX(2px);
+}
+
+/* ================================================
+   Task Actions - Cute Buttons
+   ================================================ */
+
+.task-actions-cute {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.3s ease;
+}
+
+.task-actions-cute.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.btn-action-cute {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: #FAF8F5;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+.btn-action-cute:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.action-icon {
+  font-size: 18px;
+}
+
+.action-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-breakdown-cute {
+  background: rgba(122, 155, 118, 0.08);
+  color: #7A9B76;
+  border-color: rgba(122, 155, 118, 0.2);
+}
+
+.btn-breakdown-cute:hover {
+  background: rgba(122, 155, 118, 0.15);
+  border-color: #7A9B76;
+  box-shadow: 0 4px 12px rgba(122, 155, 118, 0.2);
+}
+
+.btn-delete-cute {
+  background: rgba(217, 119, 87, 0.08);
+  color: #D97757;
+  border-color: rgba(217, 119, 87, 0.2);
+}
+
+.btn-delete-cute:hover {
+  background: rgba(217, 119, 87, 0.15);
+  border-color: #D97757;
+  box-shadow: 0 4px 12px rgba(217, 119, 87, 0.2);
+}
+
+/* ================================================
+   Subtasks Section
+   ================================================ */
+
+.task-subtasks-cute {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px dashed #E8E6E1;
+}
+
+.subtasks-placeholder-cute {
+  font-size: 13px;
+  color: #9B9690;
+  font-style: italic;
+  text-align: center;
+  padding: 12px;
+}
+
+/* ================================================
+   Responsive
+   ================================================ */
+
+@media (max-width: 768px) {
+  .task-actions-cute {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  
+  .btn-action-cute {
+    padding: 8px 10px;
+    min-width: 50px;
+  }
+  
+  .action-icon {
+    font-size: 16px;
+  }
+  
+  .action-label {
+    font-size: 10px;
+  }
+}

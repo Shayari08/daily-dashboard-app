@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\.fbd5bf78519bb228c894e8d9aae7a1777b12d744-audit.json",
+    "files": [
+        {
+            "date": 1768230172291,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\error-2026-01-12.log",
+            "hash": "2ba707423cf6e1aee80e27d3300d5726be0285b37a63f036314674d24e03a126"
+        },
+        {
+            "date": 1768639296720,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\error-2026-01-17.log",
+            "hash": "759663549861074bfbda97ffdbdffcf6d3535048b0db78cc91ed177dea0c4c8e"
+        }
+    ],
+    "hashType": "sha256"
+}
