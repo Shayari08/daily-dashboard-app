@@ -6,14 +6,24 @@
     "auditLog": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\.226c2701003c6bea654d3581a9885fb4d604f60e-audit.json",
     "files": [
         {
-            "date": 1768230172298,
-            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-01-12.log",
-            "hash": "807b835b2666b83d92204573273cdca6ee304af1234cd919fe29a83e3361b766"
+            "date": 1770882042097,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-02-12.log",
+            "hash": "1c9efbb03f996d9cdf8797d344dadea541e93ac94b0fdd4a53dc9a6068a423a9"
         },
         {
-            "date": 1768639296744,
-            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-01-17.log",
-            "hash": "392acb52495f39847f38033c0303d57ebac71dcc0af10702d93179996936d4c2"
+            "date": 1771681225365,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-02-21.log",
+            "hash": "bbb4d45da6dbc000710042dddb389d12ed862d4e40783c3c0eba15879d68adfa"
+        },
+        {
+            "date": 1771760421402,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-02-22.log",
+            "hash": "f1d168bc1d37f155bed3c0c1a00e2651041384c723c74f42ba82aaaede60195a"
+        },
+        {
+            "date": 1771939356785,
+            "name": "C:\\Users\\shaya\\Downloads\\daily-dashboard-app\\backend\\logs\\combined-2026-02-24.log",
+            "hash": "3535b932e684eb658d54bc7fa57b0dc3046285c6d399a938654269943bccc95c"
         }
     ],
     "hashType": "sha256"

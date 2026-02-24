@@ -1,52 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/HabitTracker.css';
 
-function HabitTracker({ habits, onUpdate }) {
+function HabitTracker({ onUpdate }) {
+  const [goals, setGoals] = useState([]);
   const [newHabit, setNewHabit] = useState('');
   const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
+
+  useEffect(() => {
+    loadGoals();
+  }, []);
+
+  const loadGoals = async () => {
+    try {
+      const res = await axios.get('/api/recurring-goals/today-status', { withCredentials: true });
+      setGoals(res.data.goals || []);
+    } catch (error) {
+      console.error('Failed to load goals:', error);
+    }
+  };
 
   const handleAddHabit = async (e) => {
     e.preventDefault();
     if (!newHabit.trim()) return;
 
+    const frequencyMap = {
+      daily: { frequency: 'daily', timesPerWeek: 7 },
+      weekly: { frequency: 'x_per_week', timesPerWeek: 1 },
+      monthly: { frequency: 'x_per_week', timesPerWeek: 1 }
+    };
+
+    const mapped = frequencyMap[selectedFrequency] || frequencyMap.daily;
+
     try {
-      await axios.post('/api/habits', {
-        name: newHabit,
-        frequency: selectedFrequency
+      await axios.post('/api/recurring-goals', {
+        title: newHabit,
+        frequency: mapped.frequency,
+        timesPerWeek: mapped.timesPerWeek
       }, { withCredentials: true });
 
       setNewHabit('');
       setSelectedFrequency('daily');
       setShowFrequencyPicker(false);
-      onUpdate();
+      loadGoals();
+      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Failed to create habit:', error);
     }
   };
 
-  const handleLogHabit = async (habitId) => {
+  const handleLogHabit = async (goalId) => {
     try {
-      await axios.post(`/api/habits/${habitId}/log`, {
-        completed: true,
-        date: new Date().toISOString().split('T')[0]
-      }, { withCredentials: true });
-      onUpdate();
+      await axios.post(`/api/recurring-goals/${goalId}/complete`, {}, { withCredentials: true });
+      loadGoals();
+      if (onUpdate) onUpdate();
     } catch (error) {
-      console.error('Failed to log habit:', error);
-      // Still update UI even if backend fails
-      alert('✓ Habit logged!');
-      onUpdate();
+      if (error.response?.data?.alreadyDone) {
+        alert('Already checked in today!');
+      } else {
+        console.error('Failed to log habit:', error);
+      }
     }
   };
 
-  const handleDeleteHabit = async (habitId) => {
-    if (!window.confirm('Archive this habit?')) return;
+  const handleDeleteHabit = async (goalId) => {
+    if (!window.confirm('Delete this habit?')) return;
 
     try {
-      await axios.delete(`/api/habits/${habitId}`, { withCredentials: true });
-      onUpdate();
+      await axios.delete(`/api/recurring-goals/${goalId}`, { withCredentials: true });
+      loadGoals();
+      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Failed to delete habit:', error);
     }
@@ -58,11 +82,19 @@ function HabitTracker({ habits, onUpdate }) {
     { value: 'monthly', label: 'Monthly', icon: '🗓️' }
   ];
 
+  const getFrequencyLabel = (goal) => {
+    if (goal.frequency === 'daily') return 'Daily';
+    if (goal.frequency === 'x_per_week' && goal.times_per_week === 1) return 'Weekly';
+    if (goal.frequency === 'x_per_week') return `${goal.times_per_week}x/week`;
+    if (goal.frequency === 'specific_days') return 'Specific Days';
+    return goal.frequency;
+  };
+
   return (
     <div className="habit-tracker-beautiful">
       <div className="section-header">
         <h2>Build Better Habits</h2>
-        <span className="habit-count">{habits.length} active</span>
+        <span className="habit-count">{goals.length} active</span>
       </div>
 
       {/* Add Habit Form */}
@@ -101,58 +133,59 @@ function HabitTracker({ habits, onUpdate }) {
 
       {/* Habits Grid */}
       <div className="habits-grid-beautiful">
-        {habits.map(habit => (
-          <div key={habit.id} className="habit-card-beautiful">
+        {goals.map(goal => (
+          <div key={goal.id} className={`habit-card-beautiful ${goal.completed_today ? 'completed' : ''}`}>
             {/* Delete Button */}
             <button
               className="btn-delete-habit-beautiful"
-              onClick={() => handleDeleteHabit(habit.id)}
-              title="Archive habit"
+              onClick={() => handleDeleteHabit(goal.id)}
+              title="Delete habit"
             >
               ✕
             </button>
 
-            {/* Habit Icon/Emoji */}
+            {/* Habit Icon */}
             <div className="habit-icon-beautiful">
-              🌱
+              {goal.completed_today ? '✅' : '🌱'}
             </div>
 
             {/* Habit Name */}
-            <h3 className="habit-name-beautiful">{habit.name}</h3>
+            <h3 className="habit-name-beautiful">{goal.title}</h3>
 
             {/* Frequency Badge */}
             <div className="habit-frequency-beautiful">
-              📅 {habit.frequency.charAt(0).toUpperCase() + habit.frequency.slice(1)}
+              📅 {getFrequencyLabel(goal)}
             </div>
 
             {/* Streak Display */}
-            {habit.streak > 0 && (
+            {goal.streak > 0 && (
               <div className="habit-streak-beautiful">
                 <span className="streak-flame">🔥</span>
-                <span className="streak-number">{habit.streak}</span>
+                <span className="streak-number">{goal.streak}</span>
                 <span className="streak-label">day streak</span>
               </div>
             )}
 
             {/* Check In Button */}
             <button
-              className="btn-checkin-beautiful"
-              onClick={() => handleLogHabit(habit.id)}
+              className={`btn-checkin-beautiful ${goal.completed_today ? 'checked' : ''}`}
+              onClick={() => handleLogHabit(goal.id)}
+              disabled={goal.completed_today}
             >
-              <span className="checkin-icon">✓</span>
-              <span className="checkin-text">Check In Today</span>
+              <span className="checkin-icon">{goal.completed_today ? '✓' : '○'}</span>
+              <span className="checkin-text">{goal.completed_today ? 'Done Today' : 'Check In Today'}</span>
             </button>
 
             {/* Total Completions */}
-            {habit.total_completions > 0 && (
+            {goal.total_completions > 0 && (
               <div className="habit-total-beautiful">
-                {habit.total_completions} total check-ins
+                {goal.total_completions} total check-ins
               </div>
             )}
           </div>
         ))}
 
-        {habits.length === 0 && (
+        {goals.length === 0 && (
           <div className="empty-state-habits-beautiful">
             <div className="empty-icon-habits">🌱</div>
             <p>No habits yet!</p>

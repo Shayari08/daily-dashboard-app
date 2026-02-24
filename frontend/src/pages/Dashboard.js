@@ -5,6 +5,10 @@ import TaskCard from '../components/TaskCard';
 import HabitTracker from '../components/HabitTracker';
 import Chatbot from '../components/Chatbot';
 import DailySummary from '../components/DailySummary';
+import InsightsView from '../components/InsightsView';
+import RecurringGoals from '../components/RecurringGoals';
+import RecommendationsView from '../components/RecommendationsView';
+import Navbar from '../components/Navbar';
 import '../styles/Dashboard.css';
 
 function Dashboard() {
@@ -12,12 +16,15 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
-  const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('tasks');
   const [newTask, setNewTask] = useState('');
   const [showChatbot, setShowChatbot] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
+  const [archivedTaskCount, setArchivedTaskCount] = useState(0);
+  const [generatingTasks, setGeneratingTasks] = useState(false);
+  const [breakdownTaskId, setBreakdownTaskId] = useState(null);
+  const [subtaskInput, setSubtaskInput] = useState('');
 
   useEffect(() => {
     loadData();
@@ -25,19 +32,27 @@ function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [userRes, tasksRes, completedRes, habitsRes] = await Promise.all([
+      // Check onboarding status first
+      const onboardingStatus = await axios.get('/api/onboarding/status', { withCredentials: true });
+      if (onboardingStatus.data.needsOnboarding) {
+        navigate('/onboarding');
+        return;
+      }
+
+      const [userRes, tasksRes, completedRes] = await Promise.all([
         axios.get('/api/auth/me', { withCredentials: true }),
         axios.get('/api/tasks?status=pending', { withCredentials: true }),
-        axios.get('/api/tasks?status=completed', { withCredentials: true }),
-        axios.get('/api/habits', { withCredentials: true })
+        axios.get('/api/tasks?status=completed', { withCredentials: true })
       ]);
-      
+
       setUser(userRes.data.user);
       setTasks(tasksRes.data.tasks || []);
       setCompletedTasks(completedRes.data.tasks || []);
-      setHabits(habitsRes.data.habits || []);
     } catch (error) {
       console.error('Failed to load data:', error);
+      if (error.response?.status === 401) {
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -103,24 +118,35 @@ function Dashboard() {
     }
   };
 
-  const handleBreakdown = async (taskId) => {
-    const taskTitle = tasks.find(t => t.id === taskId)?.title;
-    const subtaskPrompt = prompt(`Break down "${taskTitle}" into subtasks (comma-separated):`);
-    
-    if (!subtaskPrompt) return;
-    
-    const subtasks = subtaskPrompt.split(',').map(s => ({ title: s.trim() })).filter(s => s.title);
-    
+  const handleBreakdown = (taskId) => {
+    setBreakdownTaskId(taskId);
+    setSubtaskInput('');
+  };
+
+  const submitBreakdown = async () => {
+    if (!subtaskInput.trim()) {
+      alert('Please enter at least one subtask');
+      return;
+    }
+
+    const subtasks = subtaskInput
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(s => ({ title: s.replace(/^\d+\.\s*/, '') })); // Remove leading numbers
+
     if (subtasks.length === 0) {
       alert('Please enter at least one subtask');
       return;
     }
-    
+
     try {
-      await axios.post(`/api/tasks/${taskId}/breakdown`, {
+      await axios.post(`/api/tasks/${breakdownTaskId}/breakdown`, {
         subtasks
       }, { withCredentials: true });
       alert(`Created ${subtasks.length} subtasks!`);
+      setBreakdownTaskId(null);
+      setSubtaskInput('');
       loadData();
     } catch (error) {
       console.error('Failed to breakdown task:', error);
@@ -128,26 +154,93 @@ function Dashboard() {
     }
   };
 
+  const handleAIBreakdown = async (taskId) => {
+    if (!window.confirm('Use AI to break down this task into subtasks?')) return;
+
+    try {
+      const response = await axios.post(
+        `/api/tasks/${taskId}/ai-breakdown`,
+        {},
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        alert(`AI generated ${response.data.count} subtasks!`);
+        loadData();
+      }
+    } catch (error) {
+      console.error('Failed to AI breakdown task:', error);
+      alert('Failed to generate subtasks. Make sure you have onboarding data or try manual breakdown.');
+    }
+  };
+
   const handleDailyReset = async () => {
     if (!window.confirm('Archive completed tasks and start fresh?')) return;
-    
+
+    // Capture count BEFORE archiving
+    const countToShow = completedTasks.length;
+
     try {
       await axios.post('/api/tasks/reset-daily', {}, { withCredentials: true });
       await axios.post('/api/archive/daily', {
         date: new Date().toISOString().split('T')[0]
       }, { withCredentials: true });
-      
+
+      setArchivedTaskCount(countToShow);
       setShowDailySummary(true);
       loadData();
     } catch (error) {
       console.error('Failed to reset:', error);
-      alert('Daily reset complete!');
+      setArchivedTaskCount(countToShow);
+      setShowDailySummary(true);
       loadData();
     }
   };
 
-  const goToArchive = () => {
-    navigate('/archive');
+  const handleClearAllTasks = async () => {
+    if (!window.confirm('Delete ALL tasks? This cannot be undone!')) return;
+
+    try {
+      const response = await axios.delete('/api/tasks/clear-all', { withCredentials: true });
+      alert(`Deleted ${response.data.count} tasks`);
+      loadData();
+    } catch (error) {
+      console.error('Failed to clear tasks:', error);
+      alert('Failed to clear tasks. Please try again.');
+    }
+  };
+
+  const handleResetGoals = async () => {
+    if (!window.confirm('Reset all your goals? This will clear your onboarding data.')) return;
+
+    try {
+      await axios.delete('/api/profile/goals', { withCredentials: true });
+      alert('Goals have been reset successfully!');
+      loadData();
+    } catch (error) {
+      console.error('Failed to reset goals:', error);
+      alert('Failed to reset goals. Please try again.');
+    }
+  };
+
+  const handleGenerateTasks = async () => {
+    setGeneratingTasks(true);
+
+    try {
+      const response = await axios.post('/api/tasks/generate-and-save', {}, { withCredentials: true });
+
+      if (response.data.success) {
+        alert(`Generated ${response.data.count} new tasks based on your goals!`);
+        loadData();
+      } else {
+        alert('Failed to generate tasks. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to generate tasks:', error);
+      alert('Failed to generate tasks. Make sure you have completed onboarding.');
+    } finally {
+      setGeneratingTasks(false);
+    }
   };
 
   if (loading) {
@@ -161,61 +254,14 @@ function Dashboard() {
 
   return (
     <div className="dashboard-warm">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="header-left">
-          <h1 className="logo">Daily Dashboard</h1>
-          {user && <span className="user-greeting">Hey, {user.name.split(' ')[0]}! 👋</span>}
-        </div>
-        
-        <div className="header-actions">
-          <button 
-            className="btn-icon" 
-            onClick={goToArchive}
-            title="View Archive"
-          >
-            📚
-          </button>
-          <button 
-            className="btn-icon" 
-            onClick={handleDailyReset}
-            title="Daily Reset"
-          >
-            📦
-          </button>
-          <button 
-            className="btn-icon"
-            onClick={() => setShowChatbot(!showChatbot)}
-            title="AI Assistant"
-          >
-            💬
-          </button>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="dashboard-nav">
-        <button 
-          className={`nav-btn ${activeView === 'tasks' ? 'active' : ''}`}
-          onClick={() => setActiveView('tasks')}
-        >
-          📅 Tasks
-          <span className="badge">{tasks.length}</span>
-        </button>
-        <button 
-          className={`nav-btn ${activeView === 'habits' ? 'active' : ''}`}
-          onClick={() => setActiveView('habits')}
-        >
-          📈 Habits
-          <span className="badge">{habits.length}</span>
-        </button>
-        <button 
-          className={`nav-btn ${activeView === 'insights' ? 'active' : ''}`}
-          onClick={() => setActiveView('insights')}
-        >
-          ⚡ Insights
-        </button>
-      </nav>
+      <Navbar
+        user={user}
+        activeView={activeView}
+        setActiveView={setActiveView}
+        taskCount={tasks.length}
+        onDailyReset={handleDailyReset}
+        onToggleChat={() => setShowChatbot(!showChatbot)}
+      />
 
       {/* Main Content */}
       <main className="dashboard-main">
@@ -224,8 +270,19 @@ function Dashboard() {
           {activeView === 'tasks' && (
             <div className="tasks-view">
               <div className="section-header">
-                <h2>Today's Tasks</h2>
-                <span className="task-count">{tasks.length} active</span>
+                <div>
+                  <h2>Today's Tasks</h2>
+                  <span className="task-count">{tasks.length} active</span>
+                </div>
+                {tasks.length > 0 && (
+                  <button
+                    className="btn-secondary"
+                    onClick={handleClearAllTasks}
+                    title="Delete all tasks"
+                  >
+                    🗑️ Clear All
+                  </button>
+                )}
               </div>
 
               {/* Add Task */}
@@ -240,6 +297,20 @@ function Dashboard() {
                 />
               </form>
 
+              {/* AI Task Generation */}
+              <div className="ai-task-generation">
+                <button
+                  className="btn-ai-generate"
+                  onClick={handleGenerateTasks}
+                  disabled={generatingTasks}
+                >
+                  {generatingTasks ? '⏳ Generating Tasks...' : '✨ Generate Tasks for Me'}
+                </button>
+              </div>
+
+              {/* Recurring Goals */}
+              <RecurringGoals onTasksGenerated={loadData} />
+
               {/* Task List */}
               <div className="tasks-list">
                 {tasks.map(task => (
@@ -249,6 +320,8 @@ function Dashboard() {
                     onToggle={() => handleToggleTask(task.id, task.status)}
                     onDelete={() => handleDeleteTask(task.id)}
                     onBreakdown={() => handleBreakdown(task.id)}
+                    onAIBreakdown={() => handleAIBreakdown(task.id)}
+                    onRefresh={loadData}
                   />
                 ))}
                 
@@ -287,35 +360,30 @@ function Dashboard() {
 
           {/* Habits View */}
           {activeView === 'habits' && (
-            <HabitTracker habits={habits} onUpdate={loadData} />
+            <HabitTracker onUpdate={loadData} />
           )}
 
           {/* Insights View */}
           {activeView === 'insights' && (
             <div className="insights-view">
-              <h2>Your Insights</h2>
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <div className="stat-value">{tasks.length}</div>
-                  <div className="stat-label">Active Tasks</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-value">{completedTasks.length}</div>
-                  <div className="stat-label">Completed Today</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-value">{habits.length}</div>
-                  <div className="stat-label">Active Habits</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-value">
-                    {tasks.length + completedTasks.length > 0 
-                      ? Math.round((completedTasks.length / (tasks.length + completedTasks.length)) * 100)
-                      : 0}%
-                  </div>
-                  <div className="stat-label">Completion Rate</div>
-                </div>
+              <div className="section-header">
+                <h2>Your Insights</h2>
+                <button
+                  className="btn-secondary"
+                  onClick={handleResetGoals}
+                  title="Reset your goals and start fresh"
+                >
+                  🔄 Reset Goals
+                </button>
               </div>
+              <InsightsView userId={user?.id} />
+            </div>
+          )}
+
+          {/* Recommendations View */}
+          {activeView === 'recommendations' && (
+            <div className="recommendations-view-container">
+              <RecommendationsView onTaskAdded={loadData} />
             </div>
           )}
         </div>
@@ -328,10 +396,54 @@ function Dashboard() {
 
       {/* Daily Summary Modal */}
       {showDailySummary && (
-        <DailySummary 
-          tasksCompleted={completedTasks.length}
+        <DailySummary
+          tasksCompleted={archivedTaskCount}
           onClose={() => setShowDailySummary(false)}
         />
+      )}
+
+      {/* Task Breakdown Modal */}
+      {breakdownTaskId && (
+        <div className="modal-overlay" onClick={() => setBreakdownTaskId(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Break Down Task</h3>
+              <button
+                className="modal-close"
+                onClick={() => setBreakdownTaskId(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-instruction">
+                Enter subtasks, one per line:
+              </p>
+              <textarea
+                className="subtask-textarea"
+                placeholder="1. First subtask&#10;2. Second subtask&#10;3. Third subtask"
+                value={subtaskInput}
+                onChange={(e) => setSubtaskInput(e.target.value)}
+                rows={8}
+                autoFocus
+              />
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-secondary"
+                onClick={() => setBreakdownTaskId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={submitBreakdown}
+              >
+                Create Subtasks
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

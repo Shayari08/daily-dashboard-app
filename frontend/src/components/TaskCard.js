@@ -1,19 +1,43 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import '../styles/TaskCard.css';
 
-function TaskCard({ task, onToggle, onDelete, onBreakdown }) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, onAIBreakdown, onRefresh }) {
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [subtasks, setSubtasks] = useState(task.subtasks || []);
+
+  const handleToggleSubtask = async (subtaskId, currentStatus) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+
+    try {
+      await axios.patch(`/api/tasks/${subtaskId}`, {
+        status: newStatus
+      }, { withCredentials: true });
+
+      // Update local state
+      setSubtasks(subtasks.map(st =>
+        st.id === subtaskId ? { ...st, status: newStatus } : st
+      ));
+
+      // Refresh parent if needed
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error('Failed to toggle subtask:', error);
+    }
+  };
+
+  const completedSubtasks = subtasks.filter(st => st.status === 'completed').length;
 
   return (
-    <div 
+    <div
       className="task-card-cute"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="task-main-cute">
         {/* Cute Checkbox */}
-        <button 
+        <button
           className={`task-checkbox-cute ${task.status === 'completed' ? 'checked' : ''}`}
           onClick={onToggle}
           aria-label="Toggle task completion"
@@ -38,12 +62,12 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown }) {
               📅 {new Date(task.deadline).toLocaleDateString()}
             </div>
           )}
-          {task.subtask_count > 0 && (
-            <button 
+          {subtasks.length > 0 && (
+            <button
               className="task-subtasks-toggle-cute"
               onClick={() => setShowSubtasks(!showSubtasks)}
             >
-              {showSubtasks ? '▼' : '▶'} {task.subtask_count} subtask{task.subtask_count > 1 ? 's' : ''}
+              {showSubtasks ? '▼' : '▶'} {completedSubtasks}/{subtasks.length} subtasks
             </button>
           )}
         </div>
@@ -59,6 +83,14 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown }) {
             <span className="action-label">Break</span>
           </button>
           <button
+            className="btn-action-cute btn-ai-breakdown-cute"
+            onClick={onAIBreakdown}
+            title="AI-powered breakdown"
+          >
+            <span className="action-icon">🤖</span>
+            <span className="action-label">AI Break</span>
+          </button>
+          <button
             className="btn-action-cute btn-delete-cute"
             onClick={onDelete}
             title="Delete task"
@@ -69,12 +101,21 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown }) {
         </div>
       </div>
 
-      {/* Subtasks */}
-      {showSubtasks && task.subtask_count > 0 && (
-        <div className="task-subtasks-cute">
-          <p className="subtasks-placeholder-cute">
-            Subtasks will appear here
-          </p>
+      {/* Subtasks List */}
+      {showSubtasks && subtasks.length > 0 && (
+        <div className="subtasks-list">
+          {subtasks.map((subtask) => (
+            <div
+              key={subtask.id}
+              className={`subtask-item ${subtask.status === 'completed' ? 'completed' : ''}`}
+              onClick={() => handleToggleSubtask(subtask.id, subtask.status)}
+            >
+              <span className="subtask-bullet">
+                {subtask.status === 'completed' ? '✓' : '○'}
+              </span>
+              <span className="subtask-title">{subtask.title}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

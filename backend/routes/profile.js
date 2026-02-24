@@ -227,4 +227,129 @@ router.get('/state-history', isAuthenticated, async (req, res) => {
   }
 });
 
+// Reset goals
+router.delete('/goals', isAuthenticated, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Delete from user_goals table (if it exists)
+    await client.query('SAVEPOINT user_goals_check');
+    try {
+      await client.query('DELETE FROM user_goals WHERE user_id = $1', [req.user.id]);
+      await client.query('RELEASE SAVEPOINT user_goals_check');
+    } catch (e) {
+      // user_goals table may not exist if onboarding SQL wasn't run
+      await client.query('ROLLBACK TO SAVEPOINT user_goals_check');
+      console.log('user_goals table not found, skipping');
+    }
+
+    // Clear goals fields in user_profiles
+    await client.query(
+      `UPDATE user_profiles
+       SET short_term_goals = NULL,
+           long_term_goals = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    // Remove goals from users.onboarding_data
+    await client.query(
+      `UPDATE users
+       SET onboarding_data = NULL,
+           onboarding_completed = false
+       WHERE id = $1`,
+      [req.user.id]
+    );
+
+    // Delete AI-generated/suggested tasks (keep user-entered ones)
+    const deletedTasks = await client.query(
+      `DELETE FROM tasks
+       WHERE user_id = $1 AND created_by != 'user'
+       RETURNING id`,
+      [req.user.id]
+    );
+
+    // Delete all habit logs first (then habits)
+    await client.query(
+      `DELETE FROM habit_logs
+       WHERE habit_id IN (SELECT id FROM habits WHERE user_id = $1)`,
+      [req.user.id]
+    );
+
+    // Delete all habits
+    const deletedHabits = await client.query(
+      `DELETE FROM habits WHERE user_id = $1 RETURNING id`,
+      [req.user.id]
+    );
+
+    // Delete recurring goals
+    await client.query('SAVEPOINT recurring_goals_check');
+    try {
+      await client.query(
+        `DELETE FROM recurring_goals WHERE user_id = $1`,
+        [req.user.id]
+      );
+      await client.query('RELEASE SAVEPOINT recurring_goals_check');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT recurring_goals_check');
+      console.log('recurring_goals table not found, skipping');
+    }
+
+    // Delete user preferences
+    await client.query('SAVEPOINT preferences_check');
+    try {
+      await client.query(
+        `DELETE FROM user_preferences WHERE user_id = $1`,
+        [req.user.id]
+      );
+      await client.query('RELEASE SAVEPOINT preferences_check');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT preferences_check');
+      console.log('user_preferences table not found, skipping');
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Goals reset successfully',
+      deletedTasks: deletedTasks.rowCount,
+      deletedHabits: deletedHabits.rowCount
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Reset goals error:', error);
+    res.status(500).json({ error: 'Failed to reset goals' });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete account (CASCADE handles all related data)
+router.delete('/account', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Delete user (CASCADE will delete all related data)
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+
+    // Logout user
+    req.logout((err) => {
+      if (err) {
+        console.error('Logout error after account deletion:', err);
+      }
+      res.json({
+        success: true,
+        message: 'Account deleted successfully'
+      });
+    });
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 module.exports = router;

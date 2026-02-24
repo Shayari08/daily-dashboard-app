@@ -1,21 +1,25 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const session = require('express-session');
-const passport = require('passport');
+const passport = require('./config/passport');
 const rateLimit = require('express-rate-limit');
 const logger = require('./config/logger');
 const { metricsMiddleware, metricsHandler } = require('./middleware/metrics');
-require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
-const taskRoutes = require('./routes/tasks');
-const habitRoutes = require('./routes/habits-enhanced');
+const taskRoutes = require('./routes/tasks-enhanced');
 const assistantRoutes = require('./routes/assistant');
 const profileRoutes = require('./routes/profile');
 const insightsRoutes = require('./routes/insights');
+const onboardingRoutes = require('./routes/onboarding');
 
 const chatRoutes = require('./routes/chat');
+const archiveRoutes = require('./routes/archive');
+const recurringGoalsRoutes = require('./routes/recurring-goals');
+const recommendationsRoutes = require('./routes/recommendations');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,7 +49,6 @@ app.use(cors({
 
 // Metrics middleware (before other middlewares)
 app.use(metricsMiddleware);
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -86,12 +89,15 @@ app.use(passport.session());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/tasks', taskRoutes);
-app.use('/api/habits', habitRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/archive', archiveRoutes);
+app.use('/api/recurring-goals', recurringGoalsRoutes);
+app.use('/api/recommendations', recommendationsRoutes);
 // Metrics endpoint
 app.get('/metrics', metricsHandler);
 

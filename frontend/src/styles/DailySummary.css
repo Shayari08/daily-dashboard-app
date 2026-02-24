@@ -1,5 +1,5 @@
 /* ================================================
-   DAILY SUMMARY MODAL
+   DAILY SUMMARY MODAL - WARM THEME
    ================================================ */
 
 .daily-summary-overlay {
@@ -9,6 +9,7 @@
   right: 0;
   bottom: 0;
   background: rgba(45, 45, 45, 0.8);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,20 +27,23 @@
 }
 
 .daily-summary-modal {
-  background: var(--white);
-  border-radius: 20px;
-  padding: var(--space-xl);
-  max-width: 500px;
+  background: white;
+  border-radius: 24px;
+  padding: 40px;
+  max-width: 420px;
   width: 90%;
-  box-shadow: 0 20px 60px rgba(45, 45, 45, 0.3);
+  box-shadow:
+    0 20px 60px rgba(217, 119, 87, 0.25),
+    0 8px 24px rgba(45, 45, 45, 0.15);
   position: relative;
-  animation: slideUp 0.4s ease;
+  animation: slideUp 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  border: 2px solid rgba(217, 119, 87, 0.1);
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(30px) scale(0.95);
+    transform: translateY(40px) scale(0.9);
   }
   to {
     opacity: 1;
@@ -49,153 +53,174 @@
 
 .btn-close-modal {
   position: absolute;
-  top: var(--space-lg);
-  right: var(--space-lg);
+  top: 20px;
+  right: 20px;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
-  background: var(--cream);
-  color: var(--charcoal);
+  background: rgba(217, 119, 87, 0.1);
+  color: #D97757;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: all 0.2s ease;
+  font-size: 18px;
+  font-weight: bold;
 }
 
 .btn-close-modal:hover {
-  background: var(--light-gray);
+  background: rgba(217, 119, 87, 0.2);
+  transform: rotate(90deg);
 }
 
 .summary-header {
   text-align: center;
-  margin-bottom: var(--space-xl);
+  margin-bottom: 32px;
 }
 
 .summary-icon {
-  color: var(--gold);
-  margin-bottom: var(--space-md);
-  animation: pulse 2s ease-in-out infinite;
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: bounce 2s ease-in-out infinite;
+  display: block;
 }
 
-@keyframes pulse {
+@keyframes bounce {
   0%, 100% {
-    transform: scale(1);
-    opacity: 1;
+    transform: translateY(0) scale(1);
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0.8;
+    transform: translateY(-10px) scale(1.1);
   }
 }
 
 .summary-header h2 {
-  font-family: 'Fraunces', Georgia, serif;
   font-size: 32px;
-  font-weight: 700;
-  color: var(--charcoal);
-  margin-bottom: var(--space-sm);
+  font-weight: 800;
+  color: #2D2D2D;
+  margin: 0;
+  background: linear-gradient(135deg, #D97757 0%, #E8B86D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .summary-content {
-  margin-bottom: var(--space-xl);
+  margin-bottom: 28px;
 }
 
 .summary-stats {
   text-align: center;
-  margin-bottom: var(--space-xl);
-  padding: var(--space-xl);
-  background: linear-gradient(135deg, rgba(217, 119, 87, 0.1) 0%, rgba(232, 184, 109, 0.1) 100%);
-  border-radius: 12px;
+  margin-bottom: 24px;
+  padding: 32px;
+  background: linear-gradient(135deg, rgba(217, 119, 87, 0.08) 0%, rgba(232, 184, 109, 0.08) 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(217, 119, 87, 0.1);
 }
 
 .stat-large {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 8px;
 }
 
 .stat-large .stat-value {
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 72px;
-  font-weight: 700;
-  color: var(--terracotta);
+  font-size: 80px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #D97757 0%, #E8B86D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   line-height: 1;
 }
 
 .stat-large .stat-label {
-  font-size: 16px;
-  color: var(--medium-gray);
-  font-weight: 500;
+  font-size: 14px;
+  color: #9B9690;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
 }
 
 .summary-praise {
-  background: var(--cream);
-  border-left: 4px solid var(--gold);
-  padding: var(--space-lg);
-  border-radius: 8px;
-  margin-bottom: var(--space-lg);
+  background: linear-gradient(135deg, rgba(232, 184, 109, 0.1) 0%, rgba(217, 119, 87, 0.1) 100%);
+  border-left: 4px solid #E8B86D;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
 }
 
 .summary-praise p {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.6;
-  color: var(--charcoal);
+  color: #2D2D2D;
   font-style: italic;
+  margin: 0;
 }
 
 .summary-tomorrow {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
+  gap: 10px;
+  padding: 14px;
   background: rgba(122, 155, 118, 0.1);
-  border-radius: 8px;
-  color: var(--sage);
+  border-radius: 10px;
+  color: #7A9B76;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.summary-tomorrow span:first-child {
+  font-size: 18px;
 }
 
 .btn-continue {
   width: 100%;
-  padding: 16px 32px;
-  border-radius: 10px;
+  padding: 18px 32px;
+  border-radius: 14px;
   border: none;
-  background: var(--terracotta);
-  color: var(--white);
-  font-size: 16px;
-  font-weight: 600;
+  background: linear-gradient(135deg, #D97757 0%, #E8B86D 100%);
+  color: white;
+  font-size: 17px;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--transition-medium);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(217, 119, 87, 0.3);
 }
 
 .btn-continue:hover {
-  background: var(--forest);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-medium);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(217, 119, 87, 0.4);
+}
+
+.btn-continue:active {
+  transform: translateY(-1px);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .daily-summary-modal {
     width: 95%;
-    padding: var(--space-lg);
+    padding: 28px;
   }
-  
+
   .summary-header h2 {
-    font-size: 24px;
+    font-size: 26px;
   }
-  
+
+  .summary-icon {
+    font-size: 48px;
+  }
+
   .stat-large .stat-value {
-    font-size: 56px;
+    font-size: 60px;
   }
-  
+
   .summary-praise p {
-    font-size: 16px;
+    font-size: 15px;
   }
 }

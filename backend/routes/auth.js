@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const passport = require('../config/passport');
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 // Middleware to check authentication
 const isAuthenticated = (req, res, next) => {
@@ -17,16 +22,32 @@ router.get('/google',
 
 router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
+  async (req, res) => {
     console.log('✓ OAuth callback route reached');
     console.log('✓ User:', req.user ? req.user.email : 'No user');
     console.log('✓ Session ID:', req.sessionID);
     console.log('✓ Authenticated:', req.isAuthenticated());
-    
-    const redirectUrl = (process.env.FRONTEND_URL || 'http://localhost:3000') + '/dashboard';
-    console.log('✓ Redirecting to:', redirectUrl);
-    
-    res.redirect(redirectUrl);
+
+    try {
+      // Check if user needs onboarding
+      const result = await pool.query(
+        'SELECT onboarding_completed FROM users WHERE id = $1',
+        [req.user.id]
+      );
+
+      const needsOnboarding = !result.rows[0]?.onboarding_completed;
+      const redirectPath = needsOnboarding ? '/onboarding' : '/dashboard';
+      const redirectUrl = (process.env.FRONTEND_URL || 'http://localhost:3000') + redirectPath;
+
+      console.log('✓ Onboarding needed:', needsOnboarding);
+      console.log('✓ Redirecting to:', redirectUrl);
+
+      res.redirect(redirectUrl);
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      // Fallback to dashboard on error
+      res.redirect((process.env.FRONTEND_URL || 'http://localhost:3000') + '/dashboard');
+    }
   }
 );
 

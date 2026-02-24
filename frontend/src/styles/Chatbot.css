@@ -90,6 +90,32 @@
   transform: rotate(90deg) scale(1.1);
 }
 
+.chat-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-chat-control {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-chat-control:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
 /* Messages Area */
 .chatbot-messages-warm {
   flex: 1;

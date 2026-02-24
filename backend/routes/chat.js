@@ -8,6 +8,404 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
+// ================================================
+// COMMAND PARSER
+// ================================================
+
+async function parseAndExecuteCommand(message, userId, context) {
+  const messageLower = message.toLowerCase().trim();
+
+  // Command 1: Add task
+  const addTaskMatch = message.match(/^add task:?\s+(.+)$/i);
+  if (addTaskMatch) {
+    const title = addTaskMatch[1].trim();
+    try {
+      const result = await pool.query(
+        `INSERT INTO tasks (user_id, title, status, created_at)
+         VALUES ($1, $2, 'pending', NOW())
+         RETURNING *`,
+        [userId, title]
+      );
+      return {
+        executed: true,
+        response: `✓ Added task: "${title}"`
+      };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to add task: ${error.message}`
+      };
+    }
+  }
+
+  // Command 2: Delete task
+  const deleteTaskMatch = message.match(/^delete task:?\s+(.+)$/i);
+  if (deleteTaskMatch) {
+    const title = deleteTaskMatch[1].trim();
+    try {
+      const result = await pool.query(
+        `DELETE FROM tasks
+         WHERE user_id = $1 AND title ILIKE $2 AND deleted_at IS NULL
+         RETURNING title`,
+        [userId, `%${title}%`]
+      );
+
+      if (result.rowCount > 0) {
+        return {
+          executed: true,
+          response: `✓ Deleted ${result.rowCount} task(s) matching "${title}"`
+        };
+      } else {
+        return {
+          executed: true,
+          response: `✗ No tasks found matching "${title}"`
+        };
+      }
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to delete task: ${error.message}`
+      };
+    }
+  }
+
+  // Command 3: Mark done
+  const markDoneMatch = message.match(/^mark done:?\s+(.+)$/i);
+  if (markDoneMatch) {
+    const title = markDoneMatch[1].trim();
+    try {
+      const result = await pool.query(
+        `UPDATE tasks
+         SET status = 'completed', completed_at = NOW()
+         WHERE user_id = $1 AND title ILIKE $2 AND status = 'pending' AND deleted_at IS NULL
+         RETURNING title`,
+        [userId, `%${title}%`]
+      );
+
+      if (result.rowCount > 0) {
+        return {
+          executed: true,
+          response: `✓ Marked ${result.rowCount} task(s) as complete: "${result.rows[0].title}"`
+        };
+      } else {
+        return {
+          executed: true,
+          response: `✗ No pending tasks found matching "${title}"`
+        };
+      }
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to mark task done: ${error.message}`
+      };
+    }
+  }
+
+  // Command 4: Clear completed tasks
+  if (messageLower.match(/^clear completed tasks?$/)) {
+    try {
+      const result = await pool.query(
+        `UPDATE tasks
+         SET archived_at = NOW()
+         WHERE user_id = $1 AND status = 'completed' AND archived_at IS NULL
+         RETURNING id`,
+        [userId]
+      );
+
+      return {
+        executed: true,
+        response: `✓ Archived ${result.rowCount} completed task(s)`
+      };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to clear completed tasks: ${error.message}`
+      };
+    }
+  }
+
+  // Command 5: Breakdown task
+  const breakdownMatch = message.match(/^breakdown:?\s+(.+)$/i);
+  if (breakdownMatch) {
+    const title = breakdownMatch[1].trim();
+    try {
+      // Find the task
+      const taskResult = await pool.query(
+        `SELECT * FROM tasks
+         WHERE user_id = $1 AND title ILIKE $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [userId, `%${title}%`]
+      );
+
+      if (taskResult.rows.length === 0) {
+        return {
+          executed: true,
+          response: `✗ No task found matching "${title}"`
+        };
+      }
+
+      const task = taskResult.rows[0];
+
+      // Generate subtasks using LLM (would need to require llmService)
+      const llmService = require('../services/llmService');
+      const breakdownResult = await llmService.breakdownTask(task, context);
+
+      if (!breakdownResult.success) {
+        return {
+          executed: true,
+          response: `✗ Failed to generate subtasks: ${breakdownResult.error}`
+        };
+      }
+
+      // Insert subtasks
+      let insertedCount = 0;
+      for (const subtask of breakdownResult.subtasks) {
+        await pool.query(
+          `INSERT INTO tasks (user_id, title, description, parent_task_id, status, estimated_duration, created_at)
+           VALUES ($1, $2, $3, $4, 'pending', $5, NOW())`,
+          [
+            userId,
+            subtask.title,
+            subtask.description || null,
+            task.id,
+            subtask.estimated_duration || null
+          ]
+        );
+        insertedCount++;
+      }
+
+      return {
+        executed: true,
+        response: `✓ Created ${insertedCount} subtasks for "${task.title}"`
+      };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to breakdown task: ${error.message}`
+      };
+    }
+  }
+
+  // Command 6: Add recurring goal
+  // Patterns: "add goal: run 3x a week", "goal: read daily", "I want to meditate every day"
+  const goalPatterns = [
+    /^(?:add )?goal:?\s+(.+?)\s+(\d+)x?\s*(?:a|per)?\s*week$/i,
+    /^(?:add )?goal:?\s+(.+?)\s+(?:every\s*day|daily)$/i,
+    /^(?:add )?goal:?\s+(.+?)\s+on\s+((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s*,?\s*(?:and\s*)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))*)$/i,
+    /^i want to\s+(.+?)\s+(\d+)x?\s*(?:a|per)?\s*week$/i,
+    /^i want to\s+(.+?)\s+(?:every\s*day|daily)$/i
+  ];
+
+  for (const pattern of goalPatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      try {
+        let title, frequency, timesPerWeek = 1, specificDays = null;
+
+        if (pattern.source.includes('\\d+')) {
+          // X times per week pattern
+          title = match[1].trim();
+          timesPerWeek = parseInt(match[2]);
+          frequency = 'x_per_week';
+        } else if (pattern.source.includes('daily')) {
+          // Daily pattern
+          title = match[1].trim();
+          frequency = 'daily';
+          timesPerWeek = 7;
+        } else if (pattern.source.includes('monday|tuesday')) {
+          // Specific days pattern
+          title = match[1].trim();
+          frequency = 'specific_days';
+          const daysStr = match[2].toLowerCase();
+          specificDays = daysStr.match(/monday|tuesday|wednesday|thursday|friday|saturday|sunday/g);
+          timesPerWeek = specificDays.length;
+        }
+
+        const result = await pool.query(
+          `INSERT INTO recurring_goals
+           (user_id, title, frequency, times_per_week, specific_days, week_start_date)
+           VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
+           RETURNING *`,
+          [userId, title, frequency, timesPerWeek, specificDays]
+        );
+
+        const goal = result.rows[0];
+        let scheduleMsg = '';
+        if (frequency === 'daily') {
+          scheduleMsg = 'every day';
+        } else if (frequency === 'x_per_week') {
+          scheduleMsg = `${timesPerWeek}x per week`;
+        } else if (frequency === 'specific_days') {
+          scheduleMsg = `on ${specificDays.join(', ')}`;
+        }
+
+        return {
+          executed: true,
+          response: `✓ Added recurring goal: "${title}" (${scheduleMsg})\n\nI'll generate tasks for this automatically. Say "generate today's tasks" to create tasks now!`
+        };
+      } catch (error) {
+        return {
+          executed: true,
+          response: `✗ Failed to add goal: ${error.message}`
+        };
+      }
+    }
+  }
+
+  // Command 7: List goals
+  if (messageLower.match(/^(?:my goals|list goals|show goals|goals)$/)) {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM recurring_goals
+         WHERE user_id = $1 AND is_active = true
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          executed: true,
+          response: `You don't have any recurring goals yet.\n\nTry adding one like:\n• "add goal: run 3x a week"\n• "add goal: read daily"\n• "add goal: meditate on Monday, Wednesday, Friday"`
+        };
+      }
+
+      let response = `📋 **Your Recurring Goals:**\n\n`;
+      for (const goal of result.rows) {
+        let scheduleStr = '';
+        if (goal.frequency === 'daily') {
+          scheduleStr = 'Daily';
+        } else if (goal.frequency === 'x_per_week') {
+          scheduleStr = `${goal.times_per_week}x/week (${goal.times_completed_this_week}/${goal.times_per_week} done)`;
+        } else if (goal.frequency === 'specific_days' && goal.specific_days) {
+          scheduleStr = goal.specific_days.map(d => d.slice(0, 3)).join(', ');
+        }
+        response += `• **${goal.title}** - ${scheduleStr}\n`;
+      }
+
+      return { executed: true, response };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to fetch goals: ${error.message}`
+      };
+    }
+  }
+
+  // Command 8: Remove goal
+  const removeGoalMatch = message.match(/^(?:remove|delete) goal:?\s+(.+)$/i);
+  if (removeGoalMatch) {
+    const title = removeGoalMatch[1].trim();
+    try {
+      const result = await pool.query(
+        `DELETE FROM recurring_goals
+         WHERE user_id = $1 AND title ILIKE $2
+         RETURNING title`,
+        [userId, `%${title}%`]
+      );
+
+      if (result.rowCount > 0) {
+        return {
+          executed: true,
+          response: `✓ Removed goal: "${result.rows[0].title}"`
+        };
+      } else {
+        return {
+          executed: true,
+          response: `✗ No goal found matching "${title}"`
+        };
+      }
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to remove goal: ${error.message}`
+      };
+    }
+  }
+
+  // Command 9: Generate today's tasks
+  if (messageLower.match(/^(?:generate|create)?\s*(?:today'?s?)?\s*tasks?$/i) ||
+      messageLower.match(/^generate tasks for today$/i)) {
+    try {
+      const today = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      // Reset weekly counters if new week
+      await pool.query(
+        `UPDATE recurring_goals
+         SET times_completed_this_week = 0, week_start_date = CURRENT_DATE, tasks_generated_today = FALSE
+         WHERE user_id = $1 AND week_start_date < DATE_TRUNC('week', CURRENT_DATE)`,
+        [userId]
+      );
+
+      // Get goals that need tasks today
+      const goalsResult = await pool.query(
+        `SELECT * FROM recurring_goals
+         WHERE user_id = $1 AND is_active = true
+           AND (last_generated_date IS NULL OR last_generated_date < $2)`,
+        [userId, todayDate]
+      );
+
+      const distributions = {
+        1: ['wednesday'], 2: ['tuesday', 'friday'], 3: ['monday', 'wednesday', 'friday'],
+        4: ['monday', 'tuesday', 'thursday', 'friday'],
+        5: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        6: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        7: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+      };
+
+      const tasksCreated = [];
+      for (const goal of goalsResult.rows) {
+        let shouldGenerate = false;
+
+        if (goal.frequency === 'daily') {
+          shouldGenerate = true;
+        } else if (goal.frequency === 'specific_days' && goal.specific_days?.includes(today)) {
+          shouldGenerate = true;
+        } else if ((goal.frequency === 'x_per_week' || goal.frequency === 'weekly') &&
+                   goal.times_completed_this_week < goal.times_per_week) {
+          const dist = distributions[goal.times_per_week] || distributions[3];
+          if (dist.includes(today)) {
+            shouldGenerate = true;
+          }
+        }
+
+        if (shouldGenerate) {
+          await pool.query(
+            `INSERT INTO tasks (user_id, title, description, category, status, created_at)
+             VALUES ($1, $2, $3, $4, 'pending', NOW())`,
+            [userId, goal.title, goal.description, goal.category || 'Goals']
+          );
+          await pool.query(
+            `UPDATE recurring_goals SET last_generated_date = $1 WHERE id = $2`,
+            [todayDate, goal.id]
+          );
+          tasksCreated.push(goal.title);
+        }
+      }
+
+      if (tasksCreated.length === 0) {
+        return {
+          executed: true,
+          response: `No new tasks to generate today. Either all goals are done or already generated!\n\nSay "my goals" to see your recurring goals.`
+        };
+      }
+
+      return {
+        executed: true,
+        response: `✓ Generated ${tasksCreated.length} task(s) for today:\n\n${tasksCreated.map(t => `• ${t}`).join('\n')}`
+      };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to generate tasks: ${error.message}`
+      };
+    }
+  }
+
+  // No command matched
+  return { executed: false };
+}
+
 // Get chat history
 router.get('/history', isAuthenticated, async (req, res) => {
   try {
@@ -42,23 +440,23 @@ router.post('/message', isAuthenticated, async (req, res) => {
 
     // Save user message
     await pool.query(
-      `INSERT INTO chat_messages (user_id, role, content) 
+      `INSERT INTO chat_messages (user_id, role, content)
        VALUES ($1, $2, $3)`,
       [req.user.id, 'user', message]
     );
 
     // Get user context (recent tasks, habits, etc.)
     const tasksResult = await pool.query(
-      `SELECT title, status, deadline 
-       FROM tasks 
+      `SELECT title, status, deadline
+       FROM tasks
        WHERE user_id = $1 AND deleted_at IS NULL
        ORDER BY created_at DESC LIMIT 10`,
       [req.user.id]
     );
 
     const habitsResult = await pool.query(
-      `SELECT name, frequency, streak 
-       FROM habits 
+      `SELECT name, frequency, streak
+       FROM habits
        WHERE user_id = $1 AND archived_at IS NULL
        LIMIT 5`,
       [req.user.id]
@@ -76,27 +474,36 @@ router.post('/message', isAuthenticated, async (req, res) => {
       habits: context.activeHabits.length
     });
 
-    // Generate AI response
-    const aiResponse = await generateAIResponse(message, context);
+    // Check for commands first
+    const commandResult = await parseAndExecuteCommand(message, req.user.id, context);
 
-    console.log('🤖 AI Response:', aiResponse.substring(0, 100) + '...');
+    let aiResponse;
+    if (commandResult.executed) {
+      // Command was executed, use command response
+      aiResponse = commandResult.response;
+      console.log('⚡ Command executed:', aiResponse);
+    } else {
+      // No command, generate AI response
+      aiResponse = await generateAIResponse(message, context);
+      console.log('🤖 AI Response:', aiResponse.substring(0, 100) + '...');
+    }
 
     // Save AI message
     await pool.query(
-      `INSERT INTO chat_messages (user_id, role, content, context) 
+      `INSERT INTO chat_messages (user_id, role, content, context)
        VALUES ($1, $2, $3, $4)`,
       [req.user.id, 'assistant', aiResponse, JSON.stringify(context)]
     );
 
-    res.json({ 
-      success: true, 
-      response: aiResponse 
+    res.json({
+      success: true,
+      response: aiResponse
     });
   } catch (error) {
     console.error('❌ Chat error:', error.message);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process message',
-      details: error.message 
+      details: error.message
     });
   }
 });

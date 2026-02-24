@@ -10,14 +10,16 @@ const pool = new Pool({
 // Get archive for specific date
 router.get('/date/:date', isAuthenticated, async (req, res) => {
   try {
-    const { date } = req.params;
+    // Normalize date to YYYY-MM-DD (handles ISO strings like 2026-02-12T00:00:00.000Z)
+    const date = req.params.date.split('T')[0];
 
     // Get archived tasks for this date
     const tasksResult = await pool.query(
       `SELECT id, title, description, completed_at, priority_score
-       FROM tasks 
-       WHERE user_id = $1 
-         AND completed_date = $2 
+       FROM tasks
+       WHERE user_id = $1
+         AND status = 'completed'
+         AND COALESCE(completed_date, completed_at::date) = $2
          AND deleted_at IS NULL
        ORDER BY completed_at DESC`,
       [req.user.id, date]
@@ -60,24 +62,25 @@ router.get('/calendar', isAuthenticated, async (req, res) => {
     const { year, month } = req.query;
 
     let query = `
-      SELECT 
-        completed_date as date,
+      SELECT
+        COALESCE(completed_date, completed_at::date) as date,
         COUNT(*) as count
       FROM tasks
-      WHERE user_id = $1 
-        AND completed_date IS NOT NULL
+      WHERE user_id = $1
+        AND status = 'completed'
+        AND (completed_date IS NOT NULL OR completed_at IS NOT NULL)
         AND deleted_at IS NULL
     `;
     
     const params = [req.user.id];
     
     if (year && month) {
-      query += ` AND EXTRACT(YEAR FROM completed_date) = $2 
-                 AND EXTRACT(MONTH FROM completed_date) = $3`;
+      query += ` AND EXTRACT(YEAR FROM COALESCE(completed_date, completed_at::date)) = $2
+                 AND EXTRACT(MONTH FROM COALESCE(completed_date, completed_at::date)) = $3`;
       params.push(year, month);
     }
-    
-    query += ` GROUP BY completed_date ORDER BY completed_date DESC`;
+
+    query += ` GROUP BY COALESCE(completed_date, completed_at::date) ORDER BY date DESC`;
 
     const result = await pool.query(query, params);
 
@@ -122,10 +125,11 @@ router.post('/daily', isAuthenticated, async (req, res) => {
 
     // Count completed tasks for the day
     const tasksResult = await pool.query(
-      `SELECT COUNT(*) as count 
-       FROM tasks 
-       WHERE user_id = $1 
-         AND completed_date = $2
+      `SELECT COUNT(*) as count
+       FROM tasks
+       WHERE user_id = $1
+         AND status = 'completed'
+         AND COALESCE(completed_date, completed_at::date) = $2
          AND deleted_at IS NULL`,
       [req.user.id, archiveDate]
     );

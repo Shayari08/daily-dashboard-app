@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.env.docker
+backend/.env.docker
 
 # Dependencies
 node_modules/

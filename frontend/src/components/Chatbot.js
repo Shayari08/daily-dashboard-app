@@ -28,20 +28,81 @@ function Chatbot({ onClose }) {
       } else {
         setMessages([{
           role: 'assistant',
-          content: "Hi! I'm your productivity assistant. 👋\n\nI can help you:\n• Break down tasks into steps\n• Prioritize your work\n• Build better habits\n• Stay motivated\n\nWhat would you like help with?"
+          content: `Hi! I'm your productivity assistant. 👋
+
+**Task Commands:**
+• "add task: [name]" - Create task
+• "mark done: [name]" - Complete task
+• "breakdown: [name]" - Create subtasks
+
+**Recurring Goals:** (auto-generates tasks!)
+• "add goal: run 3x a week"
+• "add goal: read daily"
+• "my goals" - List all goals
+• "generate today's tasks"
+
+What would you like help with?`
         }]);
       }
     } catch (error) {
       console.error('Failed to load chat history:', error);
       setMessages([{
         role: 'assistant',
-        content: "Hi! I'm your productivity assistant. How can I help you today?"
+        content: `Hi! I'm your productivity assistant. 👋
+
+**Task Commands:**
+• "add task: [name]" - Create task
+• "mark done: [name]" - Complete task
+• "breakdown: [name]" - Create subtasks
+
+**Recurring Goals:** (auto-generates tasks!)
+• "add goal: run 3x a week"
+• "add goal: read daily"
+• "my goals" - List all goals
+• "generate today's tasks"
+
+What would you like help with?`
       }]);
     }
   };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleNewChat = () => {
+    setMessages([{
+      role: 'assistant',
+      content: `Hi! I'm your productivity assistant. 👋
+
+**Task Commands:**
+• "add task: [name]" - Create task
+• "mark done: [name]" - Complete task
+• "breakdown: [name]" - Create subtasks
+
+**Recurring Goals:** (auto-generates tasks!)
+• "add goal: run 3x a week"
+• "add goal: read daily"
+• "my goals" - List all goals
+• "generate today's tasks"
+
+What would you like help with?`
+    }]);
+  };
+
+  const handleDeleteChat = async () => {
+    if (!window.confirm('Delete all chat history? This cannot be undone.')) return;
+
+    try {
+      await axios.delete('/api/chat/history', { withCredentials: true });
+      setMessages([{
+        role: 'assistant',
+        content: "Hi! I'm your productivity assistant. 👋\n\nI can help you:\n• Break down tasks into steps\n• Prioritize your work\n• Build better habits\n• Stay motivated\n\nWhat would you like help with?"
+      }]);
+    } catch (error) {
+      console.error('Failed to delete chat history:', error);
+      alert('Failed to delete chat history. Please try again.');
+    }
   };
 
   const handleSend = async (e) => {
@@ -104,9 +165,17 @@ function Chatbot({ onClose }) {
             <span className="chat-status">Powered by Ollama</span>
           </div>
         </div>
-        <button className="btn-close-chat" onClick={onClose}>
-          ✕
-        </button>
+        <div className="chat-controls">
+          <button className="btn-chat-control" onClick={handleNewChat} title="New Chat">
+            ➕
+          </button>
+          <button className="btn-chat-control" onClick={handleDeleteChat} title="Delete History">
+            🗑️
+          </button>
+          <button className="btn-close-chat" onClick={onClose}>
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="chatbot-messages-warm">
