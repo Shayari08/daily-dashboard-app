@@ -1,13 +1,11 @@
-# render.yaml - Corrected paths
 services:
-  # Backend API
   - type: web
-    name: daily-dashboard-backend
+    name: daily-dashboard-app
     runtime: docker
     region: oregon
     plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -26,25 +24,21 @@ services:
         sync: false
       - key: GOOGLE_CALLBACK_URL
         sync: false
+      - key: BACKEND_URL
+        sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: LLM_PROVIDER
+        value: groq
+      - key: ONBOARDING_LLM_PROVIDER
+        value: groq
+      - key: ENABLE_FALLBACK
+        value: true
 
-  # Frontend Static Site
-  - type: web
-    name: daily-dashboard-frontend
-    runtime: docker
-    region: oregon
-    plan: free
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    envVars:
-      - key: REACT_APP_API_URL
-        fromService:
-          type: web
-          name: daily-dashboard-backend
-          property: hostWithProtocol
-
-# Database
 databases:
   - name: daily-dashboard-db
     databaseName: daily_dashboard
