@@ -55,14 +55,14 @@ INSERT INTO goal_completion_logs (goal_id, user_id, date, completed, notes, crea
 SELECT
   rg.id,
   rg.user_id,
-  hl.date,
+  hl.log_date,
   COALESCE(hl.completed, true),
   hl.notes,
   hl.created_at
 FROM habit_logs hl
 JOIN habits h ON hl.habit_id = h.id
 JOIN recurring_goals rg ON rg.title = h.name AND rg.user_id = h.user_id
-WHERE hl.date IS NOT NULL
+WHERE hl.log_date IS NOT NULL
 ON CONFLICT (goal_id, date) DO NOTHING;
 
 -- Verification

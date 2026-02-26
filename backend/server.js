@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const helmet = require('helmet');
 const session = require('express-session');
 const passport = require('./config/passport');
@@ -113,6 +114,13 @@ app.get('/health', (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+// Serve React frontend static files
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/metrics') return next();
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.logError(err, req);

@@ -3,7 +3,8 @@ import './Login.css';
 
 function Login() {
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    const apiBase = process.env.REACT_APP_API_URL || '';
+    window.location.href = `${apiBase}/api/auth/google`;
   };
 
   return (
