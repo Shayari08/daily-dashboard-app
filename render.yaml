@@ -42,6 +42,5 @@ services:
 databases:
   - name: daily-dashboard-db
     databaseName: daily_dashboard
-    user: postgres
     plan: free
     region: oregon
