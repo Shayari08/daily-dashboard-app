@@ -573,9 +573,16 @@ Generate exactly 5 resource recommendations. Each must be:
 - A SPECIFIC resource with a real or realistic title (e.g., "Atomic Habits by James Clear" not "a book about habits")
 - Include the likely author, channel, or publication name
 - Directly relevant to one of their goals or focus areas
-- Varied in type (mix of videos, articles, papers, books, podcasts, or courses)
 - Include a precise search query that would find this exact resource on Google or YouTube
 - Explain in one sentence WHY this resource matters for THIS specific user
+
+CRITICAL — match the resource type to what the goal actually needs:
+- "Stay current / keep up to date" goals → recent papers, newsletters, researcher blogs, conference talks, practitioner write-ups. Name specific recent publications or authors to follow.
+- "Learn / master a skill" goals → structured courses, textbooks, curated practice sets, hands-on exercises, step-by-step tutorials. Name the specific resource (a named course, a specific book, a well-known problem set or sheet).
+- "Build / create something" goals → project walkthroughs, case studies, documentation deep-dives, real-world examples worth studying.
+- "Understand deeply / get the theory" goals → foundational papers, textbooks, lecture series, long-form explainers from domain experts.
+- "Improve habits / mindset / wellbeing" goals → books, podcasts, talks, essays from people who've actually done it.
+Think about what this person actually needs to make progress on each goal, then pick the format that serves that need — not just varied types for the sake of variety.
 
 ${likedItems.length > 0 ? 'Since they liked certain resources, lean into that style and topic depth.' : ''}
 ${dislikedItems.length > 0 ? 'Since they disliked certain resources, avoid similar topics, formats, or difficulty levels.' : ''}
