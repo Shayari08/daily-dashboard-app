@@ -230,16 +230,10 @@ router.post('/:id/breakdown', isAuthenticated, async (req, res) => {
       insertedSubtasks.push(result.rows[0]);
     }
     
-    // Update parent task subtask count
-    await pool.query(
-      'UPDATE tasks SET subtask_count = $1 WHERE id = $2',
-      [insertedSubtasks.length, id]
-    );
-    
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       parent: parentCheck.rows[0],
-      subtasks: insertedSubtasks 
+      subtasks: insertedSubtasks
     });
   } catch (error) {
     console.error('Task breakdown error:', error);

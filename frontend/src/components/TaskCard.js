@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/TaskCard.css';
 
@@ -6,6 +6,11 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, onAIBreakdown, onRefr
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
+
+  useEffect(() => {
+    setSubtasks(task.subtasks || []);
+    if (task.subtasks?.length > 0) setShowSubtasks(true);
+  }, [task.subtasks]);
 
   const handleToggleSubtask = async (subtaskId, currentStatus) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';

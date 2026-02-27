@@ -2,11 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import '../styles/Chatbot.css';
 
+const WELCOME_MESSAGE = `Hey, I'm glad you're here. 🌿
+
+I'm not just a task manager — think of me as someone sitting with you while you work. You can vent, celebrate, think out loud, or ask for help when you're stuck.
+
+What's going on today?`;
+
 function Chatbot({ onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   useEffect(() => {
     loadHistory();
@@ -22,72 +28,26 @@ function Chatbot({ onClose }) {
         withCredentials: true,
         timeout: 5000
       });
-      
+
       if (response.data && response.data.messages && response.data.messages.length > 0) {
         setMessages(response.data.messages);
       } else {
-        setMessages([{
-          role: 'assistant',
-          content: `Hi! I'm your productivity assistant. 👋
-
-**Task Commands:**
-• "add task: [name]" - Create task
-• "mark done: [name]" - Complete task
-• "breakdown: [name]" - Create subtasks
-
-**Recurring Goals:** (auto-generates tasks!)
-• "add goal: run 3x a week"
-• "add goal: read daily"
-• "my goals" - List all goals
-• "generate today's tasks"
-
-What would you like help with?`
-        }]);
+        setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }]);
       }
     } catch (error) {
       console.error('Failed to load chat history:', error);
-      setMessages([{
-        role: 'assistant',
-        content: `Hi! I'm your productivity assistant. 👋
-
-**Task Commands:**
-• "add task: [name]" - Create task
-• "mark done: [name]" - Complete task
-• "breakdown: [name]" - Create subtasks
-
-**Recurring Goals:** (auto-generates tasks!)
-• "add goal: run 3x a week"
-• "add goal: read daily"
-• "my goals" - List all goals
-• "generate today's tasks"
-
-What would you like help with?`
-      }]);
+      setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }]);
     }
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   const handleNewChat = () => {
-    setMessages([{
-      role: 'assistant',
-      content: `Hi! I'm your productivity assistant. 👋
-
-**Task Commands:**
-• "add task: [name]" - Create task
-• "mark done: [name]" - Complete task
-• "breakdown: [name]" - Create subtasks
-
-**Recurring Goals:** (auto-generates tasks!)
-• "add goal: run 3x a week"
-• "add goal: read daily"
-• "my goals" - List all goals
-• "generate today's tasks"
-
-What would you like help with?`
-    }]);
+    setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }]);
   };
 
   const handleDeleteChat = async () => {
@@ -95,13 +55,9 @@ What would you like help with?`
 
     try {
       await axios.delete('/api/chat/history', { withCredentials: true });
-      setMessages([{
-        role: 'assistant',
-        content: "Hi! I'm your productivity assistant. 👋\n\nI can help you:\n• Break down tasks into steps\n• Prioritize your work\n• Build better habits\n• Stay motivated\n\nWhat would you like help with?"
-      }]);
+      setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }]);
     } catch (error) {
       console.error('Failed to delete chat history:', error);
-      alert('Failed to delete chat history. Please try again.');
     }
   };
 
@@ -159,10 +115,10 @@ What would you like help with?`
     <div className="chatbot-panel-warm">
       <div className="chatbot-header-warm">
         <div className="header-left-chat">
-          <span className="chat-bot-icon">🤖</span>
+          <span className="chat-bot-icon">🌿</span>
           <div>
-            <h3>AI Assistant</h3>
-            <span className="chat-status">Powered by Ollama</span>
+            <h3>Your Companion</h3>
+            <span className="chat-status">Here with you</span>
           </div>
         </div>
         <div className="chat-controls">
@@ -178,19 +134,11 @@ What would you like help with?`
         </div>
       </div>
 
-      <div className="chatbot-messages-warm">
-        {messages.length === 0 && (
-          <div className="chat-welcome-warm">
-            <div className="welcome-icon">💬</div>
-            <p>Hi! I'm your productivity assistant.</p>
-            <span>Ask me anything!</span>
-          </div>
-        )}
-
+      <div className="chatbot-messages-warm" ref={messagesContainerRef}>
         {messages.map((msg, idx) => (
           <div key={idx} className={`message-warm ${msg.role}`}>
             <div className="message-icon-warm">
-              {msg.role === 'user' ? '👤' : '🤖'}
+              {msg.role === 'user' ? '👤' : '🌿'}
             </div>
             <div className="message-content-warm">
               {msg.content.split('\n').map((line, i) => (
@@ -205,7 +153,7 @@ What would you like help with?`
 
         {loading && (
           <div className="message-warm assistant">
-            <div className="message-icon-warm">🤖</div>
+            <div className="message-icon-warm">🌿</div>
             <div className="message-content-warm typing-warm">
               <span></span>
               <span></span>
@@ -213,8 +161,6 @@ What would you like help with?`
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       <form onSubmit={handleSend} className="chatbot-input-warm">
