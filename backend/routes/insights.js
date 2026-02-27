@@ -139,7 +139,7 @@ router.post('/weekly-review', isAuthenticated, async (req, res) => {
       `SELECT h.name, hl.* FROM habit_logs hl
        JOIN habits h ON hl.habit_id = h.id
        WHERE hl.habit_id IN (SELECT id FROM habits WHERE user_id = $1)
-       AND hl.date BETWEEN $2 AND $3
+       AND hl.log_date BETWEEN $2 AND $3
        AND hl.completed = true`,
       [req.user.id, startDate.toISOString().split('T')[0], endDate]
     );
@@ -301,17 +301,17 @@ router.get('/behavioral', isAuthenticated, async (req, res) => {
     // 4. Habit Consistency
     const habitsResult = await pool.query(
       `SELECT
-         h.name,
-         h.streak,
-         h.frequency,
-         COUNT(hl.id) as logs_count
-       FROM habits h
-       LEFT JOIN habit_logs hl ON h.id = hl.habit_id
-         AND hl.date > NOW() - INTERVAL '1 day' * $2
-       WHERE h.user_id = $1
-         AND h.archived_at IS NULL
-       GROUP BY h.id, h.name, h.streak, h.frequency
-       ORDER BY h.streak DESC`,
+         rg.title as name,
+         rg.streak,
+         rg.frequency,
+         COUNT(gcl.id) as logs_count
+       FROM recurring_goals rg
+       LEFT JOIN goal_completion_logs gcl ON rg.id = gcl.goal_id
+         AND gcl.date > CURRENT_DATE - (INTERVAL '1 day' * $2)
+       WHERE rg.user_id = $1
+         AND rg.is_active = true
+       GROUP BY rg.id, rg.title, rg.streak, rg.frequency
+       ORDER BY rg.streak DESC`,
       [userId, days]
     );
 

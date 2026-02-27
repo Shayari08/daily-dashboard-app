@@ -27,12 +27,13 @@ router.get('/date/:date', isAuthenticated, async (req, res) => {
 
     // Get habits completed on this date
     const habitsResult = await pool.query(
-      `SELECT h.id, h.name, hl.completed, hl.notes
-       FROM habits h
-       JOIN habit_logs hl ON h.id = hl.habit_id
-       WHERE h.user_id = $1 
-         AND hl.date = $2
-       ORDER BY hl.created_at DESC`,
+      `SELECT rg.id, rg.title as name, gcl.completed, gcl.notes
+       FROM recurring_goals rg
+       JOIN goal_completion_logs gcl ON rg.id = gcl.goal_id
+       WHERE rg.user_id = $1
+         AND gcl.date = $2
+         AND gcl.completed = true
+       ORDER BY gcl.created_at DESC`,
       [req.user.id, date]
     );
 
@@ -136,12 +137,12 @@ router.post('/daily', isAuthenticated, async (req, res) => {
 
     // Count completed habits for the day
     const habitsResult = await pool.query(
-      `SELECT COUNT(*) as count 
-       FROM habit_logs hl
-       JOIN habits h ON hl.habit_id = h.id
-       WHERE h.user_id = $1 
-         AND hl.date = $2
-         AND hl.completed = true`,
+      `SELECT COUNT(*) as count
+       FROM goal_completion_logs gcl
+       JOIN recurring_goals rg ON gcl.goal_id = rg.id
+       WHERE rg.user_id = $1
+         AND gcl.date = $2
+         AND gcl.completed = true`,
       [req.user.id, archiveDate]
     );
 

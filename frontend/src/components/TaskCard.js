@@ -11,7 +11,7 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, onAIBreakdown, onRefr
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
 
     try {
-      await axios.patch(`/api/tasks/${subtaskId}`, {
+      await axios.put(`/api/tasks/${subtaskId}`, {
         status: newStatus
       }, { withCredentials: true });
 
