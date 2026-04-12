@@ -498,34 +498,106 @@ body {
    RESPONSIVE
    ================================================ */
 
+/* ================================================
+   BOTTOM NAVIGATION (mobile only)
+   ================================================ */
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border-top: 2px solid var(--light-gray);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 100;
+    box-shadow: 0 -4px 16px rgba(45, 45, 45, 0.08);
+  }
+
+  .bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 4px;
+    min-height: 60px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--medium-gray);
+    font-size: 10px;
+    font-weight: 600;
+    transition: var(--transition-fast);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-btn .bnav-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .bottom-nav-btn.active {
+    color: var(--terracotta);
+  }
+
+  .bottom-nav-btn .bnav-badge {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 20px);
+    background: var(--gold);
+    color: var(--charcoal);
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard-header {
-    padding: 16px;
+    padding: 12px 16px;
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
   }
-  
+
   .logo {
-    font-size: 22px;
+    font-size: 20px;
   }
-  
+
   .user-greeting {
     display: none;
   }
-  
+
+  /* Hide top nav — replaced by bottom nav */
   .dashboard-nav {
-    padding: 12px 16px;
-    overflow-x: auto;
+    display: none;
   }
-  
+
   .dashboard-main {
     padding: 16px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
     flex-direction: column;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
-  
+
   .stat-value {
     font-size: 40px;
   }

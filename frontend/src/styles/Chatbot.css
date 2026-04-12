@@ -376,8 +376,8 @@
   .chatbot-panel-warm {
     width: calc(100vw - 32px);
     right: 16px;
-    bottom: 16px;
+    bottom: calc(68px + env(safe-area-inset-bottom));
     height: 500px;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100vh - 160px);
   }
 }
