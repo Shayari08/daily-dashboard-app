@@ -3,7 +3,8 @@ require('dotenv').config();
 
 // When run directly, create a standalone pool; when imported, caller passes one in
 const standalonePool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
 const initDatabase = async (pool = standalonePool) => {
