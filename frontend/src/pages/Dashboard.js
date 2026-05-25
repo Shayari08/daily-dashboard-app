@@ -32,27 +32,20 @@ function Dashboard() {
 
   const loadData = async () => {
     try {
-      // Check onboarding status first
-      const onboardingStatus = await axios.get('/api/onboarding/status', { withCredentials: true });
-      if (onboardingStatus.data.needsOnboarding) {
-        navigate('/onboarding');
-        return;
-      }
-
       const [userRes, tasksRes, completedRes] = await Promise.all([
         axios.get('/api/auth/me', { withCredentials: true }),
         axios.get('/api/tasks?status=pending', { withCredentials: true }),
         axios.get('/api/tasks?status=completed', { withCredentials: true })
       ]);
-
       setUser(userRes.data.user);
       setTasks(tasksRes.data.tasks || []);
       setCompletedTasks(completedRes.data.tasks || []);
     } catch (error) {
       console.error('Failed to load data:', error);
-      if (error.response?.status === 401) {
-        navigate('/login');
-      }
+      // Demo mode — show dashboard without backend
+      setUser({ name: 'Demo User', email: 'demo@localhost' });
+      setTasks([]);
+      setCompletedTasks([]);
     } finally {
       setLoading(false);
     }

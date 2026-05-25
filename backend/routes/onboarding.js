@@ -5,13 +5,10 @@
 
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const { isAuthenticated } = require('./auth');
 const llmService = require('../services/llmService');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('../config/db');
 
 // ============================================
 // ROUTE: Check if user needs onboarding
@@ -665,11 +662,20 @@ router.post('/preview', isAuthenticated, async (req, res) => {
     });
     console.log('  ✓ Habits result:', habitsResult.success ? `${habitsResult.habits?.length} habits` : `Failed: ${habitsResult.error}`);
 
+    // If AI failed, build a preview from the keyword analysis so the user sees something
+    const previewTasks = tasksResult.success && tasksResult.tasks?.length > 0
+      ? tasksResult.tasks
+      : buildFallbackTaskPreview(focusAreas, textAnalysis);
+
+    const previewHabits = habitsResult.success && habitsResult.habits?.length > 0
+      ? habitsResult.habits
+      : buildFallbackHabitPreview(focusAreas, dailyRoutine, preferences, textAnalysis);
+
     res.json({
       success: true,
       preview: {
-        tasks: tasksResult.success ? tasksResult.tasks : [],
-        habits: habitsResult.success ? habitsResult.habits : [],
+        tasks: previewTasks,
+        habits: previewHabits,
         analysis: textAnalysis,
         aiStatus: {
           tasks: tasksResult.success,
@@ -685,5 +691,120 @@ router.post('/preview', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: 'Failed to generate preview', details: error.message });
   }
 });
+
+// ============================================
+// FUNCTION: Build task preview without DB (used when AI is unavailable)
+// ============================================
+function buildFallbackTaskPreview(focusAreas, textAnalysis) {
+  const focusAreaToCategory = {
+    health: 'Health & Fitness',
+    career: 'Career & Learning',
+    productivity: 'Productivity',
+    relationships: 'Relationships',
+    creativity: 'Creativity',
+    finance: 'Finance',
+    mindfulness: 'Mindfulness'
+  };
+
+  const tasksByArea = {
+    health: [
+      { title: 'Create weekly exercise schedule', description: 'Plan when and how to exercise', category: 'Health & Fitness' },
+      { title: 'Plan healthy meals for the week', description: 'Prepare nutritious meals in advance', category: 'Health & Fitness' },
+      { title: 'Set up a sleep routine', description: 'Go to bed and wake up at consistent times', category: 'Health & Fitness' }
+    ],
+    career: [
+      { title: 'Research relevant courses or training', description: 'Find learning resources for your goals', category: 'Career & Learning' },
+      { title: 'Dedicate 30 minutes daily for skill practice', description: 'Build expertise consistently', category: 'Career & Learning' },
+      { title: 'Build a portfolio project', description: 'Apply skills to a real project', category: 'Career & Learning' }
+    ],
+    productivity: [
+      { title: 'Set up morning planning routine', description: 'Start each day with intention', category: 'Productivity' },
+      { title: 'Identify and eliminate top 3 distractions', description: 'Remove obstacles to focus', category: 'Productivity' },
+      { title: 'Block focus time for deep work', description: 'Protect time for your most important tasks', category: 'Productivity' }
+    ],
+    relationships: [
+      { title: 'Schedule weekly quality time with loved ones', description: 'Nurture your most important relationships', category: 'Relationships' },
+      { title: 'Plan a meaningful activity together', description: 'Create shared memories', category: 'Relationships' }
+    ],
+    creativity: [
+      { title: 'Set up dedicated creative workspace', description: 'Create space for creative expression', category: 'Creativity' },
+      { title: 'Schedule 30-minute creative sessions', description: 'Protect time for creative pursuits', category: 'Creativity' }
+    ],
+    finance: [
+      { title: 'Create a monthly budget', description: 'Track income and expenses', category: 'Finance' },
+      { title: 'Set up automatic savings transfer', description: 'Pay yourself first', category: 'Finance' }
+    ],
+    mindfulness: [
+      { title: 'Start 5-minute daily meditation', description: 'Build a mindfulness practice', category: 'Mindfulness' },
+      { title: 'Practice gratitude journaling', description: 'Write 3 things you are grateful for each day', category: 'Mindfulness' }
+    ]
+  };
+
+  const tasks = [];
+  const areas = focusAreas && focusAreas.length > 0 ? focusAreas : ['productivity'];
+  for (const area of areas) {
+    const areaLabel = focusAreaToCategory[area] || area;
+    const areaTaskList = tasksByArea[area] || [
+      { title: `Focus on ${areaLabel}`, description: `Work towards improving ${areaLabel}`, category: areaLabel }
+    ];
+    tasks.push(...areaTaskList);
+  }
+
+  // Add from text analysis if available
+  if (textAnalysis?.suggestedTasks?.length > 0 && tasks.length < 5) {
+    textAnalysis.suggestedTasks.slice(0, 3).forEach(title => {
+      tasks.push({ title, description: 'Generated from your goals', category: 'Personal Growth' });
+    });
+  }
+
+  return tasks.slice(0, 8);
+}
+
+// ============================================
+// FUNCTION: Build habit preview without DB (used when AI is unavailable)
+// ============================================
+function buildFallbackHabitPreview(focusAreas, dailyRoutine, preferences, textAnalysis) {
+  const habits = [];
+
+  if (dailyRoutine?.morningRoutine) {
+    habits.push({ name: '🌅 Morning routine', frequency: 'daily', description: 'Start the day with intention' });
+    habits.push({ name: '💧 Drink water first thing', frequency: 'daily', description: 'Hydrate right after waking up' });
+  }
+
+  if (focusAreas?.includes('health')) {
+    habits.push({ name: '🏃 Exercise', frequency: 'daily', description: 'Move your body every day' });
+    habits.push({ name: '🥗 Eat a healthy meal', frequency: 'daily', description: 'Nourish yourself well' });
+  }
+
+  if (focusAreas?.includes('career')) {
+    habits.push({ name: '📚 Study / learn', frequency: 'daily', description: 'Grow your skills every day' });
+    habits.push({ name: '📖 Read', frequency: 'daily', description: '20+ pages of something valuable' });
+  }
+
+  if (focusAreas?.includes('productivity') || preferences?.workStyle === 'focused') {
+    habits.push({ name: '🎯 Deep work session', frequency: 'daily', description: 'Focused, distraction-free work' });
+    habits.push({ name: '📝 Daily planning', frequency: 'daily', description: 'Plan your top 3 priorities' });
+  }
+
+  if (focusAreas?.includes('mindfulness') || preferences?.mindfulness || textAnalysis?.insights?.mindfulnessFocus) {
+    habits.push({ name: '🧘 Meditation', frequency: 'daily', description: 'Calm your mind daily' });
+  }
+
+  if (dailyRoutine?.eveningRoutine) {
+    habits.push({ name: '📓 Evening reflection', frequency: 'daily', description: 'Review your day and plan tomorrow' });
+    habits.push({ name: '🛏️ Consistent bedtime', frequency: 'daily', description: 'Protect your sleep' });
+  }
+
+  // Ensure there's always something to show
+  if (habits.length === 0) {
+    habits.push(
+      { name: '💧 Drink enough water', frequency: 'daily', description: 'Stay hydrated throughout the day' },
+      { name: '🎯 Daily planning', frequency: 'daily', description: 'Plan your priorities each morning' },
+      { name: '📓 Evening reflection', frequency: 'daily', description: 'Review what went well today' }
+    );
+  }
+
+  return habits.slice(0, 8);
+}
 
 module.exports = router;

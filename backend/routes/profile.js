@@ -1,11 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const { isAuthenticated } = require('./auth');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('../config/db');
 
 // Get user profile
 router.get('/', isAuthenticated, async (req, res) => {
@@ -330,26 +327,22 @@ router.delete('/goals', isAuthenticated, async (req, res) => {
 
 // Delete account (CASCADE handles all related data)
 router.delete('/account', isAuthenticated, async (req, res) => {
+  const userId = req.user.id;
   try {
-    const userId = req.user.id;
-
-    // Delete user (CASCADE will delete all related data)
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);
-
-    // Logout user
-    req.logout((err) => {
-      if (err) {
-        console.error('Logout error after account deletion:', err);
-      }
-      res.json({
-        success: true,
-        message: 'Account deleted successfully'
-      });
-    });
   } catch (error) {
     console.error('Account deletion error:', error);
-    res.status(500).json({ error: 'Failed to delete account' });
+    return res.status(500).json({ error: 'Failed to delete account' });
   }
+
+  // Destroy session after the DB delete so the response is always sent
+  req.logout((err) => {
+    if (err) console.error('Logout error after account deletion:', err);
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.json({ success: true, message: 'Account deleted successfully' });
+    });
+  });
 });
 
 module.exports = router;

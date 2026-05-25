@@ -1,11 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const { isAuthenticated } = require('./auth');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('../config/db');
 
 // Get all habits
 router.get('/', isAuthenticated, async (req, res) => {

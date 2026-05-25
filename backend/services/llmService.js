@@ -26,10 +26,9 @@ class LLMService {
   }
 
   async generateOnboardingCompletion(prompt, options = {}) {
-    // Use onboarding-specific provider with higher token limit
     const onboardingOptions = {
       ...options,
-      max_tokens: options.max_tokens || 2048 // Increase from 512 to 2048 for longer onboarding responses
+      max_tokens: options.max_tokens || 800
     };
 
     if (this.onboardingProvider === 'groq') {
@@ -93,17 +92,17 @@ class LLMService {
 
   async generateGroqCompletion(prompt, options = {}) {
     try {
-      // Groq uses OpenAI-compatible API
+      const messages = [];
+      if (options.system) {
+        messages.push({ role: 'system', content: options.system });
+      }
+      messages.push({ role: 'user', content: prompt });
+
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
         {
           model: this.groqModel,
-          messages: [
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
+          messages,
           temperature: options.temperature || 0.7,
           top_p: options.top_p || 0.9,
           max_tokens: options.max_tokens || 512
@@ -175,33 +174,13 @@ class LLMService {
   }
 
   async generateTaskSuggestions(userGoals, context = {}) {
-    const prompt = `You are an adaptive productivity assistant. Generate 3-5 actionable task suggestions based on the following user goals and context.
+    const prompt = `Goals: ${userGoals.join('; ')}
+Context: ${JSON.stringify(context)}
 
-User Goals:
-${userGoals.map((g, i) => `${i + 1}. ${g}`).join('\n')}
+Generate 3-5 actionable tasks. JSON array only:
+[{"title":"...","description":"one sentence","energy_required":3,"reasoning":"one sentence"}]`;
 
-Context:
-${JSON.stringify(context, null, 2)}
-
-For each task suggestion, provide:
-1. Task title (concise, actionable)
-2. Brief description
-3. Estimated energy required (1-5, where 1 is low and 5 is high)
-4. Reasoning (why this task is relevant)
-
-Format your response as JSON array:
-[
-  {
-    "title": "Task title",
-    "description": "Brief description",
-    "energy_required": 3,
-    "reasoning": "Why this task matters"
-  }
-]
-
-Return ONLY the JSON array, no additional text.`;
-
-    const response = await this.generateCompletion(prompt, { temperature: 0.8 });
+    const response = await this.generateCompletion(prompt, { temperature: 0.8, max_tokens: 400 });
     
     if (response.success) {
       try {
@@ -217,31 +196,13 @@ Return ONLY the JSON array, no additional text.`;
   }
 
   async breakdownTask(task, userContext = {}) {
-    const prompt = `Break down the following task into 3-5 smaller, manageable subtasks. Make each subtask concrete and achievable.
+    const prompt = `Task: "${task.title}"${task.description ? '\nDetails: ' + task.description : ''}
+Context: ${JSON.stringify(userContext)}
 
-Task: ${task.title}
-Description: ${task.description || 'No additional description'}
+Break into 3-5 concrete subtasks. JSON array only:
+[{"title":"...","description":"one sentence","estimated_duration":30}]`;
 
-User Context:
-${JSON.stringify(userContext, null, 2)}
-
-For each subtask, provide:
-1. Title (clear, actionable)
-2. Description (brief, specific)
-3. Estimated duration in minutes
-
-Format as JSON array:
-[
-  {
-    "title": "Subtask title",
-    "description": "What to do",
-    "estimated_duration": 30
-  }
-]
-
-Return ONLY the JSON array.`;
-
-    const response = await this.generateCompletion(prompt, { temperature: 0.7 });
+    const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 400 });
     
     if (response.success) {
       try {
@@ -278,8 +239,8 @@ Format as JSON:
 
 Return ONLY the JSON object.`;
 
-    const response = await this.generateCompletion(prompt, { temperature: 0.6 });
-    
+    const response = await this.generateCompletion(prompt, { temperature: 0.6, max_tokens: 150 });
+
     if (response.success) {
       try {
         const analysis = JSON.parse(response.text);
@@ -293,30 +254,11 @@ Return ONLY the JSON object.`;
   }
 
   async generateInsight(behaviorData, insightType) {
-    const prompt = `Generate a ${insightType} insight based on the following user behavior data.
+    const prompt = `Generate a ${insightType} insight from this behavior data: ${JSON.stringify(behaviorData)}
+Be empathetic, focus on patterns not failures. JSON only:
+{"title":"concise title","content":"2-3 sentences","confidence":"low|medium|high","suggestion":"optional one sentence"}`;
 
-Data:
-${JSON.stringify(behaviorData, null, 2)}
-
-Provide:
-1. Title (concise, engaging)
-2. Content (2-3 sentences of insight)
-3. Confidence level (low, medium, high)
-4. Actionable suggestion (optional)
-
-Be empathetic, supportive, and never judgmental. Focus on patterns, not failures.
-
-Format as JSON:
-{
-  "title": "Insight title",
-  "content": "Detailed insight",
-  "confidence": "medium",
-  "suggestion": "Optional action"
-}
-
-Return ONLY the JSON object.`;
-
-    const response = await this.generateCompletion(prompt, { temperature: 0.7 });
+    const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 200 });
     
     if (response.success) {
       try {
@@ -331,18 +273,11 @@ Return ONLY the JSON object.`;
   }
 
   async answerQuestion(question, context) {
-    const prompt = `You are a helpful productivity assistant. Answer the user's question based on the provided context.
-
+    const prompt = `Context: ${JSON.stringify(context)}
 Question: ${question}
+Answer concisely:`;
 
-Context:
-${JSON.stringify(context, null, 2)}
-
-Provide a clear, concise, and helpful answer. Be transparent about what information you're using to answer.
-
-Response:`;
-
-    const response = await this.generateCompletion(prompt, { temperature: 0.7 });
+    const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 350 });
     return response;
   }
 
@@ -374,17 +309,11 @@ Response:`;
   }
 
   async analyzeOnboardingGoals(goalsText) {
-    const prompt = `Analyze this user's goals: "${goalsText}"
+    const system = 'Extract goal themes and return JSON only. No prose.';
+    const prompt = `Goals: "${goalsText}"
+Return: {"themes":["kw1","kw2"],"insight":"1-2 encouraging sentences.","tone":"positive|ambitious|cautious"}`;
 
-Extract:
-- themes (2-4 keywords)
-- insight (1-2 encouraging sentences)
-- tone (positive/ambitious/cautious)
-
-Return ONLY valid JSON:
-{"themes":["keyword1","keyword2"],"insight":"Encouraging message","tone":"positive"}`;
-
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.7 });
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.6, max_tokens: 120, system });
 
     if (response.success) {
       try {
@@ -402,27 +331,18 @@ Return ONLY valid JSON:
   async generateOnboardingTasks(onboardingData) {
     const { goalsText, focusAreas, dailyRoutine, preferences } = onboardingData;
 
-    const prompt = `Generate 5-7 personalized starter tasks for a user with these goals:
-"${goalsText}"
+    const system = 'You generate first-day starter tasks as a JSON array. Return JSON only — no prose, no markdown.';
 
-SELECTED Focus areas (ONLY generate tasks for these): ${focusAreas.join(', ')}
-Work style: ${preferences.workStyle || 'balanced'}
+    const prompt = `Goals: "${goalsText}"
+Focus areas (only these): ${focusAreas.join(', ')}
+Work style: ${preferences?.workStyle || 'balanced'} | Morning routine: ${dailyRoutine?.morningRoutine ? 'yes' : 'no'} | Evening: ${dailyRoutine?.eveningRoutine ? 'yes' : 'no'}
 
-IMPORTANT: ONLY create tasks related to the selected focus areas above. Do NOT add fitness, exercise, or health tasks unless the user explicitly selected health/fitness as a focus area.
+Generate 5-7 tasks. Constraints: completable today in 15-60 min; first 1-2 tasks under 20 min (quick wins); specific actions not vague goals; at least one task supports a habit; one setup task per goal area max; strictly within listed focus areas.
 
-Create actionable, specific tasks. Return ONLY valid JSON array:
-[
-  {
-    "title": "Task name (actionable)",
-    "description": "What to do (1 sentence)",
-    "category": "${focusAreas[0] || 'General'}",
-    "priority": "medium",
-    "estimatedDuration": 30,
-    "reasoning": "Why this helps (brief)"
-  }
-]`;
+JSON array only:
+[{"title":"...","description":"one sentence","category":"...","priority":"high|medium|low","estimatedDuration":30,"reasoning":"one sentence"}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8 });
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system });
 
     if (response.success) {
       try {
@@ -446,6 +366,7 @@ Create actionable, specific tasks. Return ONLY valid JSON array:
       dailyRoutine,
       recurringGoals,
       recentCompletedTasks,
+      categoryProgress,
       pendingTasks
     } = context;
 
@@ -455,56 +376,57 @@ Create actionable, specific tasks. Return ONLY valid JSON array:
     if (specificMetrics?.sleepHours) metricsLines.push(`Sleep goal: ${specificMetrics.sleepHours} hours/night`);
 
     const routineLines = [];
-    if (dailyRoutine?.morningRoutine) routineLines.push('Wants a morning routine');
-    if (dailyRoutine?.eveningRoutine) routineLines.push('Wants an evening routine');
+    if (dailyRoutine?.morningRoutine) routineLines.push('Morning routine');
+    if (dailyRoutine?.eveningRoutine) routineLines.push('Evening routine');
 
     const goalsListText = (recurringGoals || [])
       .map(g => `- ${g.title} (${g.frequency === 'daily' ? 'daily' : g.times_per_week + 'x/week'})`)
       .join('\n');
 
+    // Build progress picture: which areas have been worked on vs neglected
+    const progressMap = {};
+    (categoryProgress || []).forEach(row => { progressMap[row.category] = parseInt(row.completed_count); });
+    const focusAreasArr = focusAreas || [];
+    const progressLines = focusAreasArr.map(area => {
+      const count = progressMap[area] || 0;
+      if (count === 0) return `- ${area}: NO tasks completed yet (NEGLECTED — high priority)`;
+      if (count <= 2) return `- ${area}: ${count} task(s) completed in last 30 days (low engagement)`;
+      if (count <= 6) return `- ${area}: ${count} tasks completed (moderate progress)`;
+      return `- ${area}: ${count} tasks completed (strong momentum — keep it up)`;
+    });
+
     const recentText = (recentCompletedTasks || [])
-      .map(t => `- ${t.title} (${new Date(t.completed_at).toLocaleDateString()})`)
+      .slice(0, 15)
+      .map(t => `- [${t.category || 'General'}] ${t.title} (${new Date(t.completed_at).toLocaleDateString()})`)
       .join('\n');
 
     const pendingText = (pendingTasks || [])
-      .map(t => `- ${t.title}`)
+      .map(t => `- [${t.category || 'General'}] ${t.title}`)
       .join('\n');
 
-    const prompt = `You are a daily task planner. The user has goals but struggles to integrate them into daily life. Create concrete tasks they can do TODAY.
+    const system = 'You generate today\'s tasks as a JSON array calibrated to the user\'s actual progress. Return JSON only — no prose, no markdown.';
 
-Their goals: "${goalsText || 'Not specified'}"
-Focus areas: ${(focusAreas || []).join(', ') || 'General'}
-Work style: ${workStyle || 'balanced'}
-${metricsLines.length > 0 ? '\nSpecific metrics:\n' + metricsLines.join('\n') : ''}
-${routineLines.length > 0 ? '\nRoutine preferences:\n' + routineLines.join('\n') : ''}
+    const prompt = `Goals: "${goalsText || 'Not specified'}"
+Focus areas: ${focusAreasArr.join(', ') || 'General'} | Work style: ${workStyle || 'balanced'}${metricsLines.length > 0 ? ' | ' + metricsLines.join(', ') : ''}${routineLines.length > 0 ? ' | ' + routineLines.join(', ') : ''}
 
-Their recurring commitments (already tracked separately, don't overlap):
-${goalsListText || 'None yet'}
+Progress last 30 days (prioritize NEGLECTED areas with 2+ tasks):
+${progressLines.length > 0 ? progressLines.join('\n') : 'No data — treat all areas equally'}
 
-Recently completed tasks (don't repeat these):
+Recurring commitments (do NOT overlap):
+${goalsListText || 'None'}
+
+Recently completed — last 14 days (do NOT repeat):
 ${recentText || 'None'}
 
-Currently pending tasks (don't duplicate these):
+Pending tasks (do NOT duplicate):
 ${pendingText || 'None'}
 
-Generate 5-7 NEW tasks for today. Each must be:
-- Completable in one sitting (15-60 min)
-- A specific action (GOOD: "Do a 20-min bodyweight workout", BAD: "Work on fitness")
-- Different from existing/recent tasks
-- Complementary to recurring goals (fill gaps, not overlap)
-- Related to their selected focus areas
+Generate 5-7 tasks for TODAY: specific and completable in 15-60 min, no repeats, each advances a stated goal, next logical step for areas with momentum.
 
-Return ONLY valid JSON array:
-[
-  {
-    "title": "Specific actionable task",
-    "description": "What to do (1 sentence)",
-    "category": "Focus area",
-    "estimatedDuration": 30
-  }
-]`;
+JSON array only:
+[{"title":"...","description":"one sentence","category":"...","estimatedDuration":30}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8 });
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system });
 
     if (response.success) {
       try {
@@ -533,7 +455,7 @@ Return ONLY valid JSON array:
       .map(g => `- ${g.title} (${g.category || 'General'}, ${g.frequency})`)
       .join('\n');
 
-    const tasksText = (currentTasks || [])
+    const tasksText = (currentTasks || []).slice(0, 10)
       .map(t => `- ${t.title}${t.category ? ` [${t.category}]` : ''}`)
       .join('\n');
 
@@ -548,58 +470,26 @@ Return ONLY valid JSON array:
       ? dislikedItems.map(f => `- "${f.title}" (${f.resource_type})`).join('\n')
       : 'None yet';
 
-    const prompt = `You are a knowledgeable mentor and curator who recommends specific, high-quality learning resources. You know real books, real YouTube channels, real researchers, and real publications. Your recommendations should feel like they come from someone who has actually consumed these resources.
+    const system = `You are a well-read mentor who recommends specific, named resources. Rules:
+- Real title + real author/channel always (e.g. "Deep Work by Cal Newport", not "a productivity book")
+- Match format to need: skill-building→course/book, staying current→newsletter/talk, building→case study, mindset→podcast/book, theory→textbook/lecture
+- relevance_reason must name the user's specific goal, not a generic benefit
+- Avoid anything similar to disliked items; follow direction of liked items
+Return JSON array only — no prose.`;
 
-The user has the following goals and context:
+    const prompt = `Goals: "${goalsText || 'General self-improvement'}"
+Focus: ${(focusAreas || []).join(', ') || 'General'} | Work style: ${workStyle || 'balanced'}
 
-GOALS: "${goalsText || 'General self-improvement'}"
-FOCUS AREAS: ${(focusAreas || []).join(', ') || 'General'}
-WORK STYLE: ${workStyle || 'balanced'}
+Currently working on: ${tasksText || 'nothing tracked'}
+Recurring commitments: ${goalsListText || 'none'}
+Liked: ${likedText}
+Disliked: ${dislikedText}
 
-Their active recurring commitments:
-${goalsListText || 'None'}
+Generate exactly 5 recommendations.
+JSON array only:
+[{"title":"...","description":"2 sentences","resource_type":"video|article|paper|book|podcast|course","search_query":"...","author_or_source":"...","relevance_reason":"one sentence naming their specific goal"}]`;
 
-What they are currently working on:
-${tasksText || 'No active tasks'}
-
-FEEDBACK FROM PAST RECOMMENDATIONS (use this to calibrate):
-Resources they LIKED (recommend MORE like these):
-${likedText}
-
-Resources they DISLIKED (recommend LESS like these):
-${dislikedText}
-
-Generate exactly 5 resource recommendations. Each must be:
-- A SPECIFIC resource with a real or realistic title (e.g., "Atomic Habits by James Clear" not "a book about habits")
-- Include the likely author, channel, or publication name
-- Directly relevant to one of their goals or focus areas
-- Include a precise search query that would find this exact resource on Google or YouTube
-- Explain in one sentence WHY this resource matters for THIS specific user
-
-CRITICAL — match the resource type to what the goal actually needs:
-- "Stay current / keep up to date" goals → recent papers, newsletters, researcher blogs, conference talks, practitioner write-ups. Name specific recent publications or authors to follow.
-- "Learn / master a skill" goals → structured courses, textbooks, curated practice sets, hands-on exercises, step-by-step tutorials. Name the specific resource (a named course, a specific book, a well-known problem set or sheet).
-- "Build / create something" goals → project walkthroughs, case studies, documentation deep-dives, real-world examples worth studying.
-- "Understand deeply / get the theory" goals → foundational papers, textbooks, lecture series, long-form explainers from domain experts.
-- "Improve habits / mindset / wellbeing" goals → books, podcasts, talks, essays from people who've actually done it.
-Think about what this person actually needs to make progress on each goal, then pick the format that serves that need — not just varied types for the sake of variety.
-
-${likedItems.length > 0 ? 'Since they liked certain resources, lean into that style and topic depth.' : ''}
-${dislikedItems.length > 0 ? 'Since they disliked certain resources, avoid similar topics, formats, or difficulty levels.' : ''}
-
-Return ONLY valid JSON array:
-[
-  {
-    "title": "Specific Resource Title",
-    "description": "2-3 sentence description of what the user will learn",
-    "resource_type": "video|article|paper|book|podcast|course",
-    "search_query": "exact search query to find this on Google or YouTube",
-    "author_or_source": "Author name, channel, or publication",
-    "relevance_reason": "One sentence connecting this to the user's specific goal"
-  }
-]`;
-
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8 });
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 900, system });
 
     if (response.success) {
       try {
@@ -617,49 +507,17 @@ Return ONLY valid JSON array:
   async generateOnboardingHabits(onboardingData) {
     const { goalsText, focusAreas, dailyRoutine, preferences, aiAnalysis } = onboardingData;
 
-    const prompt = `You are a gentle habit-building coach. Generate 3-5 starter habits for this user based on their onboarding responses.
+    const system = `You design first-day habit stacks as a JSON array. Rules: start tiny (5-15 min max); anchor each habit to an existing routine (mention the anchor); achievable on day one; directly compounds toward a stated goal; varied timing if morning+evening both wanted; strictly within the stated focus areas. Return JSON only.`;
 
-User's Goals: ${goalsText}
+    const prompt = `Goals: "${goalsText}"
+Focus areas (only these): ${focusAreas.join(', ')}
+Morning routine: ${dailyRoutine?.morningRoutine ? 'yes' : 'no'} | Evening: ${dailyRoutine?.eveningRoutine ? 'yes' : 'no'} | Mindfulness: ${preferences?.mindfulness ? 'yes' : 'no'}
 
-SELECTED Focus Areas (ONLY generate habits for these): ${focusAreas.join(', ')}
+Generate 3-5 habits. Include the anchor point in each description.
+JSON array only:
+[{"name":"emoji Name","frequency":"daily|weekly","description":"what to do + anchor point, 1-2 sentences","category":"...","reasoning":"one sentence on compounding effect"}]`;
 
-Daily Routine:
-- Morning routine preference: ${dailyRoutine.morningRoutine ? 'Yes' : 'No'}
-- Evening routine preference: ${dailyRoutine.eveningRoutine ? 'Yes' : 'No'}
-
-Preferences:
-- Work style: ${preferences.workStyle || 'Not specified'}
-- Mindfulness interest: ${preferences.mindfulness ? 'Yes' : 'No'}
-
-IMPORTANT: ONLY create habits related to the selected focus areas listed above. Do NOT add fitness, exercise, workout, or health habits unless the user explicitly selected health/fitness as a focus area.
-
-For each habit, provide:
-1. Name (include relevant emoji)
-2. Frequency (daily, weekly, or custom)
-3. Description (brief, encouraging)
-4. Category (matching their focus areas)
-5. Why this habit matters
-
-Make habits:
-- Small and achievable (easy wins)
-- Aligned with their routine preferences
-- Supportive of their stated goals
-- Varied (not all same category)
-
-Format as JSON array:
-[
-  {
-    "name": "🌅 Morning Meditation",
-    "frequency": "daily",
-    "description": "Start your day with calm",
-    "category": "Mindfulness",
-    "reasoning": "Builds mental clarity"
-  }
-]
-
-Return ONLY the JSON array.`;
-
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8 });
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 550, system });
 
     if (response.success) {
       try {

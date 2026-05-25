@@ -55,9 +55,10 @@ function Onboarding() {
       }
     } catch (error) {
       console.error('Error checking onboarding status:', error);
-      if (error.response?.status === 401) {
-        navigate('/login');
-      }
+      // Auth check temporarily disabled for demo
+      // if (error.response?.status === 401) {
+      //   navigate('/login');
+      // }
     }
   };
 

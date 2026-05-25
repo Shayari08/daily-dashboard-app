@@ -51,7 +51,13 @@ function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onTo
       navigate('/login');
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setDeleteError('Failed to delete account. Please try again.');
+      if (error.response?.status === 401) {
+        setDeleteError('You are not logged in. Please log in and try again.');
+      } else if (!error.response) {
+        setDeleteError('Cannot reach the server. Make sure the backend is running.');
+      } else {
+        setDeleteError('Failed to delete account. Please try again.');
+      }
     }
   };
 

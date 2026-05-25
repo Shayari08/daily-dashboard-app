@@ -1,12 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const { isAuthenticated } = require('./auth');
 const llmService = require('../services/llmService');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('../config/db');
 
 // Get all tasks for user (excluding deleted)
 router.get('/', isAuthenticated, async (req, res) => {
@@ -326,18 +323,30 @@ router.post('/generate-and-save', isAuthenticated, async (req, res) => {
       [req.user.id]
     );
 
-    // Fetch recently completed tasks (last 3 days)
+    // Fetch recently completed tasks (last 14 days) with category for progress analysis
     const recentCompletedResult = await client.query(
-      `SELECT title, completed_at FROM tasks
+      `SELECT title, category, completed_at FROM tasks
        WHERE user_id = $1 AND status = 'completed' AND deleted_at IS NULL
-         AND completed_at >= NOW() - INTERVAL '3 days'
-       ORDER BY completed_at DESC`,
+         AND completed_at >= NOW() - INTERVAL '14 days'
+       ORDER BY completed_at DESC
+       LIMIT 40`,
+      [req.user.id]
+    );
+
+    // Progress per category over last 30 days
+    const progressResult = await client.query(
+      `SELECT category, COUNT(*) AS completed_count
+       FROM tasks
+       WHERE user_id = $1 AND status = 'completed' AND deleted_at IS NULL
+         AND completed_at >= NOW() - INTERVAL '30 days'
+       GROUP BY category
+       ORDER BY completed_count DESC`,
       [req.user.id]
     );
 
     // Fetch current pending tasks
     const pendingResult = await client.query(
-      `SELECT title FROM tasks
+      `SELECT title, category FROM tasks
        WHERE user_id = $1 AND status = 'pending' AND deleted_at IS NULL AND archived_at IS NULL`,
       [req.user.id]
     );
@@ -363,6 +372,7 @@ router.post('/generate-and-save', isAuthenticated, async (req, res) => {
       dailyRoutine: onboardingData.dailyRoutine || {},
       recurringGoals: goalsResult.rows,
       recentCompletedTasks: recentCompletedResult.rows,
+      categoryProgress: progressResult.rows,
       pendingTasks: pendingResult.rows
     });
 

@@ -5,11 +5,16 @@ const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
 const session = require('express-session');
+const connectPgSimple = require('connect-pg-simple');
 const passport = require('./config/passport');
 const rateLimit = require('express-rate-limit');
 const logger = require('./config/logger');
 const { metricsMiddleware, metricsHandler } = require('./middleware/metrics');
+const pool = require('./config/db');
 
+const PgSession = connectPgSimple(session);
+
+const initDatabase = require('./scripts/initDatabase');
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks-enhanced');
 const assistantRoutes = require('./routes/assistant');
@@ -71,15 +76,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session configuration
+// Session configuration — backed by PostgreSQL so sessions survive server restarts
 app.use(session({
+  store: new PgSession({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: true   // auto-creates the session table on first run
+  }),
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: false,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,   
+    maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days
     sameSite: 'lax'
   }
 }));
@@ -104,22 +114,21 @@ app.get('/metrics', metricsHandler);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage()
   });
 });
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-// Serve React frontend static files
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/metrics') return next();
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Serve React frontend static files (production only)
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/metrics') return next();
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -137,17 +146,27 @@ app.use((req, res) => {
   res.status(404).json({ error: { message: 'Route not found' } });
 });
 
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`Metrics available at http://localhost:${PORT}/metrics`);
-});
+let server;
+initDatabase(pool)
+  .then(() => {
+    server = app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`Metrics available at http://localhost:${PORT}/metrics`);
+    });
+  })
+  .catch((err) => {
+    logger.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
+  server.close(async () => {
     logger.info('HTTP server closed');
+    await pool.end();
+    logger.info('Database pool closed');
   });
 });
 

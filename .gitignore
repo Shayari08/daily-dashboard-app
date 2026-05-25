@@ -15,6 +15,10 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+backend/logs/
+
+# Claude Code local settings
+.claude/
 
 # OS files
 .DS_Store

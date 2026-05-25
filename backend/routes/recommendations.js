@@ -1,12 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const { isAuthenticated } = require('./auth');
 const llmService = require('../services/llmService');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('../config/db');
 
 // ================================================
 // GET /api/recommendations - Fetch latest batch
