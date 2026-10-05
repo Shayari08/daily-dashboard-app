@@ -19,6 +19,7 @@ Daily Dashboard is an **LLM-powered adaptive productivity web application** that
 Built with **React**, **Node.js**, **PostgreSQL**, and **LLaMA 3** (via Ollama).
 
 ---
+<img width="1240" height="908" alt="image" src="https://github.com/user-attachments/assets/0c6738c1-44c7-43a5-b965-94c162859ba4" />
 
 ## 🎯 Key Features
 
@@ -45,6 +46,8 @@ Built with **React**, **Node.js**, **PostgreSQL**, and **LLaMA 3** (via Ollama).
 - Opt-in habit suggestions with supporting evidence
 - Streak tracking without pressure
 - Flexible frequency options (daily, weekly, custom)
+<img width="1244" height="902" alt="image" src="https://github.com/user-attachments/assets/cbc556dc-2812-4cdd-938c-093596359edc" />
+
 
 ### 5. **Behavior-Aware Adaptation**
 - Log daily energy, pain levels, and cycle phases (all optional)
