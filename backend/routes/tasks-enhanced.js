@@ -376,18 +376,83 @@ router.post('/generate-and-save', isAuthenticated, async (req, res) => {
       pendingTasks: pendingResult.rows
     });
 
-    if (!generationResult.success || !generationResult.tasks) {
-      await client.query('ROLLBACK');
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate tasks',
-        details: generationResult.error
-      });
+    let generatedTasks = [];
+
+    if (generationResult.success && Array.isArray(generationResult.tasks) && generationResult.tasks.length > 0) {
+      generatedTasks = generationResult.tasks;
+    } else {
+      console.warn('LLM task generation unavailable, using smart tailored fallback generator');
+      const areaTaskPool = {
+        'health': [
+          { title: 'Do 20 minutes of cardio or brisk walk', description: 'Get heart rate up and boost daytime energy', category: 'Health & Fitness', estimatedDuration: 20, priority: 'medium' },
+          { title: 'Drink a glass of water and stretch for 10 minutes', description: 'Relieve muscle stiffness and stay hydrated', category: 'Health & Fitness', estimatedDuration: 10, priority: 'low' },
+          { title: 'Cook or prepare a nutrient-dense balanced lunch', description: 'Fuel your afternoon with clean energy', category: 'Health & Fitness', estimatedDuration: 25, priority: 'medium' }
+        ],
+        'career': [
+          { title: 'Complete 1 learning module or lesson in your course', description: 'Dedicated 30-minute skill-building sprint', category: 'Career & Learning', estimatedDuration: 30, priority: 'high' },
+          { title: 'Read 15 pages of your technical/business book', description: 'Take quick notes on the top takeaway', category: 'Career & Learning', estimatedDuration: 20, priority: 'medium' },
+          { title: 'Refine 1 section of your portfolio or project', description: 'Ship an incremental improvement to career materials', category: 'Career & Learning', estimatedDuration: 25, priority: 'medium' }
+        ],
+        'productivity': [
+          { title: 'Complete your top priority task before noon', description: 'Single-task with zero distractions until done', category: 'Productivity', estimatedDuration: 45, priority: 'high' },
+          { title: '15-minute inbox zero and desktop sweep', description: 'Clear out digital clutter and pending emails', category: 'Productivity', estimatedDuration: 15, priority: 'low' },
+          { title: 'Run a 25-minute Pomodoro focus block on main project', description: 'Work in a timed burst without checking notifications', category: 'Productivity', estimatedDuration: 25, priority: 'medium' }
+        ],
+        'finance': [
+          { title: 'Review and categorize bank transactions from past week', description: 'Ensure budget totals match reality', category: 'Finance', estimatedDuration: 15, priority: 'medium' },
+          { title: 'Check subscriptions and cancel any unused services', description: 'Save on recurring expenses', category: 'Finance', estimatedDuration: 15, priority: 'low' },
+          { title: 'Log today\'s expenses into your tracker or spreadsheet', description: 'Track spending for accurate weekly overview', category: 'Finance', estimatedDuration: 10, priority: 'low' }
+        ],
+        'relationships': [
+          { title: 'Reach out to a close friend or family member for a check-in', description: 'Send a thoughtful text or make a 10-minute call', category: 'Relationships', estimatedDuration: 15, priority: 'medium' },
+          { title: 'Plan an intentional meal or outing with someone close', description: 'Strengthen bonds through dedicated quality time', category: 'Relationships', estimatedDuration: 15, priority: 'medium' }
+        ],
+        'creativity': [
+          { title: '20-minute creative writing, sketching, or brainstorming session', description: 'Generate fresh concepts without judging the output', category: 'Creativity', estimatedDuration: 20, priority: 'medium' },
+          { title: 'Curate 3 inspiring references for your creative project', description: 'Save high-quality inspiration for future work', category: 'Creativity', estimatedDuration: 15, priority: 'low' }
+        ],
+        'mindfulness': [
+          { title: 'Complete a 10-minute mindful breathing or meditation session', description: 'Reset your nervous system and refocus your mind', category: 'Mindfulness', estimatedDuration: 10, priority: 'medium' },
+          { title: 'Write down 3 specific things you are grateful for today', description: 'Notice small positive moments from the day', category: 'Mindfulness', estimatedDuration: 5, priority: 'low' }
+        ]
+      };
+
+      const pendingTitles = new Set((pendingResult.rows || []).map(t => (t.title || '').toLowerCase()));
+      const selectedAreas = (onboardingData.focusAreas && onboardingData.focusAreas.length > 0)
+        ? onboardingData.focusAreas
+        : ['productivity', 'health', 'career'];
+
+      for (const area of selectedAreas) {
+        const key = area.toLowerCase().includes('health') ? 'health'
+          : area.toLowerCase().includes('career') ? 'career'
+          : area.toLowerCase().includes('prod') ? 'productivity'
+          : area.toLowerCase().includes('finan') ? 'finance'
+          : area.toLowerCase().includes('relat') ? 'relationships'
+          : area.toLowerCase().includes('creat') ? 'creativity'
+          : area.toLowerCase().includes('mind') ? 'mindfulness'
+          : 'productivity';
+
+        const poolItems = areaTaskPool[key] || areaTaskPool.productivity;
+        for (const item of poolItems) {
+          if (!pendingTitles.has(item.title.toLowerCase()) && !generatedTasks.some(gt => gt.title === item.title)) {
+            generatedTasks.push(item);
+            break; // 1 per focus area
+          }
+        }
+      }
+
+      if (generatedTasks.length === 0) {
+        generatedTasks.push(
+          { title: 'Identify top 3 priority tasks for today', description: 'Clarify high-impact work before diving in', category: 'Productivity', estimatedDuration: 15, priority: 'high' },
+          { title: 'Do a 20-minute focused working session', description: 'Concentrate on one single deliverable', category: 'Productivity', estimatedDuration: 20, priority: 'medium' },
+          { title: 'Take a 15-minute walk or movement break', description: 'Step away from screen to recharge energy', category: 'Health & Fitness', estimatedDuration: 15, priority: 'low' }
+        );
+      }
     }
 
     // Insert generated tasks
     const insertedTasks = [];
-    for (const task of generationResult.tasks) {
+    for (const task of generatedTasks) {
       const result = await client.query(
         `INSERT INTO tasks (
            user_id, title, description, category, priority,

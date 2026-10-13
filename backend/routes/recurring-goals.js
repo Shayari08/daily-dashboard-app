@@ -122,16 +122,16 @@ router.post('/', isAuthenticated, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO recurring_goals
        (user_id, title, description, category, frequency, times_per_week,
-        specific_days, preferred_time, duration_minutes, week_start_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_DATE)
+        specific_days, preferred_time, duration_minutes, is_active, week_start_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, CURRENT_DATE)
        RETURNING *`,
       [
         req.user.id,
-        title,
+        title.trim(),
         description || null,
         category || 'General',
         frequency,
-        timesPerWeek || 1,
+        timesPerWeek || (frequency === 'daily' ? 7 : 1),
         specificDays || null,
         preferredTime || 'any',
         durationMinutes || null
@@ -141,7 +141,7 @@ router.post('/', isAuthenticated, async (req, res) => {
     res.json({ success: true, goal: result.rows[0] });
   } catch (error) {
     console.error('Create recurring goal error:', error);
-    res.status(500).json({ error: 'Failed to create recurring goal' });
+    res.status(500).json({ error: error.message || 'Failed to create recurring goal' });
   }
 });
 
@@ -413,42 +413,60 @@ router.get('/today-status', isAuthenticated, async (req, res) => {
   try {
     const today = getDayOfWeek();
 
-    const result = await pool.query(
-      `SELECT
-         rg.*,
-         COALESCE(rg.streak, 0) as streak,
-         COALESCE(rg.best_streak, 0) as best_streak,
-         COALESCE(cl.total_completions, 0) as total_completions,
-         CASE
-           WHEN rg.last_completed_date = CURRENT_DATE THEN true
-           ELSE false
-         END as completed_today,
-         CASE
-           WHEN rg.last_completed_date = CURRENT_DATE THEN false
-           WHEN rg.frequency = 'daily' THEN true
-           WHEN rg.frequency = 'specific_days' AND $2 = ANY(rg.specific_days) THEN true
-           WHEN rg.frequency IN ('x_per_week', 'weekly')
-                AND rg.times_completed_this_week < rg.times_per_week THEN true
-           ELSE false
-         END as due_today,
-         CASE
-           WHEN rg.frequency IN ('x_per_week', 'weekly') THEN
-             rg.times_per_week - rg.times_completed_this_week
-           ELSE NULL
-         END as remaining_this_week
-       FROM recurring_goals rg
-       LEFT JOIN (
-         SELECT goal_id, COUNT(*) as total_completions
-         FROM goal_completion_logs
-         WHERE completed = true
-         GROUP BY goal_id
-       ) cl ON cl.goal_id = rg.id
-       WHERE rg.user_id = $1 AND rg.is_active = true
-       ORDER BY due_today DESC, rg.created_at DESC`,
-      [req.user.id, today]
-    );
+    try {
+      const result = await pool.query(
+        `SELECT
+           rg.*,
+           COALESCE(rg.streak, 0) as streak,
+           COALESCE(rg.best_streak, 0) as best_streak,
+           COALESCE(cl.total_completions, 0) as total_completions,
+           CASE
+             WHEN rg.last_completed_date = CURRENT_DATE THEN true
+             ELSE false
+           END as completed_today,
+           CASE
+             WHEN rg.last_completed_date = CURRENT_DATE THEN false
+             WHEN rg.frequency = 'daily' THEN true
+             WHEN rg.frequency = 'specific_days' AND $2 = ANY(rg.specific_days) THEN true
+             WHEN rg.frequency IN ('x_per_week', 'weekly')
+                  AND rg.times_completed_this_week < rg.times_per_week THEN true
+             ELSE false
+           END as due_today,
+           CASE
+             WHEN rg.frequency IN ('x_per_week', 'weekly') THEN
+               rg.times_per_week - rg.times_completed_this_week
+             ELSE NULL
+           END as remaining_this_week
+         FROM recurring_goals rg
+         LEFT JOIN (
+           SELECT goal_id, COUNT(*) as total_completions
+           FROM goal_completion_logs
+           WHERE completed = true
+           GROUP BY goal_id
+         ) cl ON cl.goal_id = rg.id
+         WHERE rg.user_id = $1 AND COALESCE(rg.is_active, true) = true
+         ORDER BY due_today DESC, rg.created_at DESC`,
+        [req.user.id, today]
+      );
 
-    res.json({ success: true, goals: result.rows, today });
+      return res.json({ success: true, goals: result.rows, today });
+    } catch (dbError) {
+      console.warn('Full today-status query failed, falling back to base recurring_goals:', dbError.message);
+      const fallbackResult = await pool.query(
+        `SELECT
+           rg.*,
+           COALESCE(rg.streak, 0) as streak,
+           COALESCE(rg.best_streak, 0) as best_streak,
+           0 as total_completions,
+           (rg.last_completed_date = CURRENT_DATE) as completed_today,
+           true as due_today
+         FROM recurring_goals rg
+         WHERE rg.user_id = $1 AND COALESCE(rg.is_active, true) = true
+         ORDER BY rg.created_at DESC`,
+        [req.user.id]
+      );
+      return res.json({ success: true, goals: fallbackResult.rows, today });
+    }
   } catch (error) {
     console.error('Get today status error:', error);
     res.status(500).json({ error: 'Failed to fetch today status' });

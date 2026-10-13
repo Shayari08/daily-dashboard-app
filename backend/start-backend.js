@@ -90,6 +90,100 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
+app.post('/api/tasks/generate-and-save', (req, res) => {
+  const sampleGen = [
+    { id: Date.now().toString(), user_id: mockUser.id, title: 'Complete a 25-minute Pomodoro focus session', description: 'Single-task with zero distractions', category: 'Productivity', status: 'pending', created_by: 'ai' },
+    { id: (Date.now() + 1).toString(), user_id: mockUser.id, title: 'Do 20 minutes of brisk movement or walking', description: 'Recharge physical energy for the day', category: 'Health & Fitness', status: 'pending', created_by: 'ai' },
+    { id: (Date.now() + 2).toString(), user_id: mockUser.id, title: 'Read 15 pages of your current learning book', description: 'Take notes on the main takeaway', category: 'Career & Learning', status: 'pending', created_by: 'ai' }
+  ];
+  tasks.push(...sampleGen);
+  res.json({ success: true, count: sampleGen.length, tasks: sampleGen });
+});
+
+let recurringGoals = [
+  { id: 'rg-1', user_id: mockUser.id, title: 'Drink 8 glasses of water', frequency: 'daily', times_per_week: 7, streak: 3, best_streak: 5, is_active: true, due_today: true, completed_today: false, total_completions: 12 },
+  { id: 'rg-2', user_id: mockUser.id, title: 'Exercise 3x per week', frequency: 'x_per_week', times_per_week: 3, times_completed_this_week: 1, streak: 2, best_streak: 4, is_active: true, due_today: true, completed_today: false, total_completions: 8 }
+];
+
+app.get('/api/recurring-goals/today-status', (req, res) => {
+  res.json({ success: true, goals: recurringGoals });
+});
+
+app.post('/api/recurring-goals', (req, res) => {
+  const goal = {
+    id: Date.now().toString(),
+    user_id: mockUser.id,
+    title: req.body.title,
+    frequency: req.body.frequency || 'daily',
+    times_per_week: req.body.timesPerWeek || (req.body.frequency === 'daily' ? 7 : 1),
+    streak: 0,
+    best_streak: 0,
+    is_active: true,
+    due_today: true,
+    completed_today: false,
+    total_completions: 0
+  };
+  recurringGoals.push(goal);
+  res.json({ success: true, goal });
+});
+
+app.post('/api/recurring-goals/:id/complete', (req, res) => {
+  const g = recurringGoals.find(g => g.id === req.params.id);
+  if (g) {
+    g.completed_today = true;
+    g.streak = (g.streak || 0) + 1;
+    g.best_streak = Math.max(g.best_streak || 0, g.streak);
+    g.total_completions = (g.total_completions || 0) + 1;
+    res.json({ success: true, goal: g });
+  } else {
+    res.status(404).json({ error: 'Goal not found' });
+  }
+});
+
+app.delete('/api/recurring-goals/:id', (req, res) => {
+  recurringGoals = recurringGoals.filter(g => g.id !== req.params.id);
+  res.json({ success: true, message: 'Goal deleted' });
+});
+
+let recommendations = [
+  { id: 'rec-1', title: 'Atomic Habits by James Clear', description: 'Tiny changes, remarkable results.', resource_type: 'book', author_or_source: 'James Clear', search_query: 'Atomic Habits James Clear', relevance_reason: 'Reinforces daily consistency.' },
+  { id: 'rec-2', title: 'Huberman Lab: Master Your Sleep & Energy Protocols', description: 'Science-backed protocols for high energy.', resource_type: 'podcast', author_or_source: 'Dr. Andrew Huberman', search_query: 'Huberman Lab sleep energy', relevance_reason: 'Boosts daytime stamina and alertness.' },
+  { id: 'rec-3', title: 'Deep Work by Cal Newport', description: 'How to focus without distraction.', resource_type: 'book', author_or_source: 'Cal Newport', search_query: 'Deep Work Cal Newport', relevance_reason: 'Helps carve out uninterrupted focus blocks.' }
+];
+
+app.get('/api/recommendations', (req, res) => {
+  res.json({ recommendations });
+});
+
+app.post('/api/recommendations/generate', (req, res) => {
+  res.json({ success: true, count: recommendations.length, recommendations });
+});
+
+app.post('/api/recommendations/:id/react', (req, res) => {
+  const rec = recommendations.find(r => r.id === req.params.id);
+  if (rec) rec.reaction = req.body.reaction;
+  res.json({ success: true });
+});
+
+app.post('/api/recommendations/:id/add-to-tasks', (req, res) => {
+  const rec = recommendations.find(r => r.id === req.params.id);
+  if (rec) {
+    rec.added_to_tasks = true;
+    tasks.push({
+      id: Date.now().toString(),
+      user_id: mockUser.id,
+      title: `Explore: ${rec.title}`,
+      description: rec.description || '',
+      category: 'Learning',
+      status: 'pending',
+      created_by: 'ai'
+    });
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', mode: 'test' });
 });

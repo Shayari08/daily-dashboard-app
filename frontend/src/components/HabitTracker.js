@@ -22,8 +22,9 @@ function HabitTracker({ onUpdate }) {
   };
 
   const handleAddHabit = async (e) => {
-    e.preventDefault();
-    if (!newHabit.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const habitTitle = newHabit.trim();
+    if (!habitTitle) return;
 
     const frequencyMap = {
       daily: { frequency: 'daily', timesPerWeek: 7 },
@@ -35,7 +36,8 @@ function HabitTracker({ onUpdate }) {
 
     try {
       await axios.post('/api/recurring-goals', {
-        title: newHabit,
+        title: habitTitle,
+        category: 'Habit',
         frequency: mapped.frequency,
         timesPerWeek: mapped.timesPerWeek
       }, { withCredentials: true });
@@ -47,6 +49,7 @@ function HabitTracker({ onUpdate }) {
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Failed to create habit:', error);
+      alert(error.response?.data?.error || 'Failed to create habit. Please try again.');
     }
   };
 
@@ -107,8 +110,15 @@ function HabitTracker({ onUpdate }) {
             value={newHabit}
             onChange={(e) => setNewHabit(e.target.value)}
             onFocus={() => setShowFrequencyPicker(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddHabit(e);
+              }
+            }}
             className="add-habit-input-beautiful"
           />
+          <button type="submit" style={{ display: 'none' }} aria-hidden="true">Add</button>
         </div>
 
         {showFrequencyPicker && (

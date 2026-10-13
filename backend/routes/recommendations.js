@@ -88,13 +88,198 @@ router.post('/generate', isAuthenticated, async (req, res) => {
       pastFeedback: feedbackResult.rows
     });
 
-    if (!generationResult.success || !generationResult.recommendations) {
-      await client.query('ROLLBACK');
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate recommendations',
-        details: generationResult.error
-      });
+    let recommendationsToSave = [];
+
+    if (generationResult.success && Array.isArray(generationResult.recommendations) && generationResult.recommendations.length > 0) {
+      recommendationsToSave = generationResult.recommendations;
+    } else {
+      console.warn('LLM recommendations unavailable, using curated recommendation engine');
+      const curatedCatalog = {
+        productivity: [
+          {
+            title: 'Atomic Habits by James Clear',
+            description: 'A proven framework for improving every day through small, compounding habit changes.',
+            resource_type: 'book',
+            search_query: 'Atomic Habits James Clear summary',
+            author_or_source: 'James Clear',
+            relevance_reason: 'Directly helps optimize your daily dashboard routines and eliminate habit friction.'
+          },
+          {
+            title: 'Deep Work by Cal Newport',
+            description: 'The ability to focus without distraction on cognitively demanding tasks.',
+            resource_type: 'book',
+            search_query: 'Deep Work Cal Newport key principles',
+            author_or_source: 'Cal Newport',
+            relevance_reason: 'Equips you with strategies to protect time blocks from interruptions.'
+          },
+          {
+            title: 'How to Stop Procrastinating and Take Action',
+            description: 'Actionable video guide breaking down the psychological triggers of task avoidance.',
+            resource_type: 'video',
+            search_query: 'how to stop procrastinating actionable guide',
+            author_or_source: 'Ali Abdaal',
+            relevance_reason: 'Practical techniques to quickly overcome task inertia on busy days.'
+          }
+        ],
+        health: [
+          {
+            title: 'Huberman Lab: Master Your Sleep & Energy Protocols',
+            description: 'Science-backed protocols for sunlight exposure, sleep optimization, and sustained daytime energy.',
+            resource_type: 'podcast',
+            search_query: 'Huberman Lab sleep energy protocol',
+            author_or_source: 'Dr. Andrew Huberman',
+            relevance_reason: 'Optimizing sleep is the highest-leverage lever for boosting daily stamina.'
+          },
+          {
+            title: 'Outlive: The Science and Art of Longevity',
+            description: 'A comprehensive handbook on cardiovascular health, exercise, nutritional biochemistry, and emotional health.',
+            resource_type: 'book',
+            search_query: 'Outlive Peter Attia summary',
+            author_or_source: 'Dr. Peter Attia',
+            relevance_reason: 'Translates physical fitness and nutrition goals into measurable daily actions.'
+          },
+          {
+            title: 'Full Body Mobility & Posture Routine in 15 Minutes',
+            description: 'A low-barrier physical routine to relieve stiffness from prolonged desk work.',
+            resource_type: 'video',
+            search_query: '15 minute desk worker mobility routine',
+            author_or_source: 'Tom Merrick',
+            relevance_reason: 'Easy 15-minute routine to seamlessly incorporate movement into your schedule.'
+          }
+        ],
+        career: [
+          {
+            title: 'Make It Stick: The Science of Successful Learning',
+            description: 'Evidence-based cognitive science techniques for effective retention and skill mastery.',
+            resource_type: 'book',
+            search_query: 'Make It Stick learning techniques',
+            author_or_source: 'Peter C. Brown',
+            relevance_reason: 'Accelerates how fast you acquire and retain skills in your learning plan.'
+          },
+          {
+            title: 'The Pragmatic Programmer',
+            description: 'Timeless principles for software engineering craft, critical thinking, and technical problem solving.',
+            resource_type: 'book',
+            search_query: 'The Pragmatic Programmer summary',
+            author_or_source: 'David Thomas & Andrew Hunt',
+            relevance_reason: 'Strengthens engineering fundamentals and day-to-day coding practices.'
+          },
+          {
+            title: 'Learning How to Learn',
+            description: 'Understand focused vs. diffuse modes of thinking and tackle complex subjects with confidence.',
+            resource_type: 'course',
+            search_query: 'Learning How to Learn Coursera Barbara Oakley',
+            author_or_source: 'Dr. Barbara Oakley',
+            relevance_reason: 'Maximizes the efficiency of your study blocks and reduces burnout.'
+          }
+        ],
+        finance: [
+          {
+            title: 'The Psychology of Money',
+            description: 'Timeless lessons on how behavior, ego, and emotion govern financial decisions more than spreadsheets.',
+            resource_type: 'book',
+            search_query: 'The Psychology of Money Morgan Housel',
+            author_or_source: 'Morgan Housel',
+            relevance_reason: 'Cultivates a calm, disciplined approach to budgeting, saving, and investing.'
+          },
+          {
+            title: 'I Will Teach You to Be Rich (Automating Finances)',
+            description: 'A 6-week blueprint for automated bill paying, debt elimination, and guilt-free spending.',
+            resource_type: 'book',
+            search_query: 'I Will Teach You To Be Rich automation system',
+            author_or_source: 'Ramit Sethi',
+            relevance_reason: 'Guides you to set up automatic transfers so your financial goals run on autopilot.'
+          }
+        ],
+        relationships: [
+          {
+            title: 'Nonviolent Communication: A Language of Life',
+            description: 'Framework for expressing feelings, hearing others deeply, and resolving conflicts with empathy.',
+            resource_type: 'book',
+            search_query: 'Nonviolent Communication Marshall Rosenberg',
+            author_or_source: 'Marshall B. Rosenberg',
+            relevance_reason: 'Elevates quality time and active listening with loved ones.'
+          },
+          {
+            title: 'The Power of Vulnerability',
+            description: 'Groundbreaking lecture on how authentic connection requires courage and openness.',
+            resource_type: 'video',
+            search_query: 'Brene Brown TED Power of Vulnerability',
+            author_or_source: 'Brené Brown',
+            relevance_reason: 'Inspires deeper, more authentic interpersonal relationships.'
+          }
+        ],
+        creativity: [
+          {
+            title: 'Steal Like an Artist',
+            description: 'Ten principles to unlock your creative voice, remix influences, and build creative habits.',
+            resource_type: 'book',
+            search_query: 'Steal Like an Artist Austin Kleon',
+            author_or_source: 'Austin Kleon',
+            relevance_reason: 'Removes perfectionism and jump-starts your creative brainstorming.'
+          }
+        ],
+        mindfulness: [
+          {
+            title: 'Wherever You Go, There You Are',
+            description: 'Warm, accessible guide to mindfulness meditation in ordinary everyday routines.',
+            resource_type: 'book',
+            search_query: 'Wherever You Go There You Are Jon Kabat Zinn',
+            author_or_source: 'Jon Kabat-Zinn',
+            relevance_reason: 'A gentle companion for starting a grounded, consistent daily meditation habit.'
+          },
+          {
+            title: '10% Happier Podcast: Mindful Everyday Resilience',
+            description: 'Interviews with meditation teachers and scientists on keeping calm amid high-stress schedules.',
+            resource_type: 'podcast',
+            search_query: '10 Percent Happier Podcast Dan Harris',
+            author_or_source: 'Dan Harris',
+            relevance_reason: 'Practical advice for staying centered while managing multiple daily priorities.'
+          }
+        ]
+      };
+
+      const dislikedTitles = new Set(
+        (feedbackResult.rows || [])
+          .filter(f => f.reaction === 'disliked')
+          .map(f => (f.title || '').toLowerCase())
+      );
+
+      const targetAreas = (onboardingData.focusAreas && onboardingData.focusAreas.length > 0)
+        ? onboardingData.focusAreas.map(a => a.toLowerCase())
+        : ['productivity', 'career', 'health'];
+
+      // Gather candidate items from matching areas
+      const candidates = [];
+      for (const area of targetAreas) {
+        const key = area.includes('health') ? 'health'
+          : area.includes('career') ? 'career'
+          : area.includes('finan') ? 'finance'
+          : area.includes('relat') ? 'relationships'
+          : area.includes('creat') ? 'creativity'
+          : area.includes('mind') ? 'mindfulness'
+          : 'productivity';
+
+        const list = curatedCatalog[key] || curatedCatalog.productivity;
+        for (const item of list) {
+          if (!dislikedTitles.has(item.title.toLowerCase()) && !candidates.some(c => c.title === item.title)) {
+            candidates.push(item);
+          }
+        }
+      }
+
+      // Fill up to 5 recommendations with productivity/general if needed
+      for (const cat of ['productivity', 'health', 'career', 'finance', 'mindfulness']) {
+        if (candidates.length >= 5) break;
+        for (const item of curatedCatalog[cat]) {
+          if (candidates.length >= 5) break;
+          if (!dislikedTitles.has(item.title.toLowerCase()) && !candidates.some(c => c.title === item.title)) {
+            candidates.push(item);
+          }
+        }
+      }
+
+      recommendationsToSave = candidates.slice(0, 5);
     }
 
     // Generate shared batch_id
@@ -103,7 +288,7 @@ router.post('/generate', isAuthenticated, async (req, res) => {
 
     // Insert recommendations
     const inserted = [];
-    for (const rec of generationResult.recommendations) {
+    for (const rec of recommendationsToSave) {
       const result = await client.query(
         `INSERT INTO recommendations
          (user_id, title, description, resource_type, search_query,

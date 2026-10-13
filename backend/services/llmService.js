@@ -421,7 +421,7 @@ ${recentText || 'None'}
 Pending tasks (do NOT duplicate):
 ${pendingText || 'None'}
 
-Generate 5-7 tasks for TODAY: specific and completable in 15-60 min, no repeats, each advances a stated goal, next logical step for areas with momentum.
+Generate 5-7 tasks for TODAY: specific and completable in 15-45 min, no repeats. NEVER output broad umbrella goals like "Focus on...", "Improve...", or multi-day projects. Every title MUST begin with an action verb (e.g., "Review...", "Draft...", "Do 20-min...", "Read 15 pages...") with concrete completion criteria.
 
 JSON array only:
 [{"title":"...","description":"one sentence","category":"...","estimatedDuration":30}]`;

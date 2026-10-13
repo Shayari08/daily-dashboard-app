@@ -180,6 +180,67 @@ const initDatabase = async (pool = standalonePool) => {
     `);
     console.log('✓ Recurring goals table created');
 
+    // Ensure all recurring_goals columns exist if table already existed
+    await client.query(`
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'General';
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS frequency VARCHAR(50) DEFAULT 'daily';
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS times_per_week INTEGER DEFAULT 1;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS specific_days TEXT[];
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS times_completed_this_week INTEGER DEFAULT 0;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS week_start_date DATE DEFAULT CURRENT_DATE;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS last_generated_date DATE;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS tasks_generated_today BOOLEAN DEFAULT FALSE;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS last_completed_date DATE;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS preferred_time VARCHAR(50);
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS best_streak INTEGER DEFAULT 0;
+      ALTER TABLE recurring_goals ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+      UPDATE recurring_goals SET is_active = true WHERE is_active IS NULL;
+    `);
+
+    // Goal completion logs table (for recurring goals and habits)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS goal_completion_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        goal_id UUID NOT NULL REFERENCES recurring_goals(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        completed BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(goal_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_goal_completion_logs_goal ON goal_completion_logs(goal_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_goal_completion_logs_user ON goal_completion_logs(user_id, date DESC);
+    `);
+    console.log('✓ Goal completion logs table created');
+
+    // Sync legacy habits into recurring_goals if any exist
+    try {
+      await client.query(`
+        INSERT INTO recurring_goals (user_id, title, frequency, times_per_week, streak, best_streak, last_completed_date, is_active, created_at)
+        SELECT
+          h.user_id,
+          h.name,
+          CASE WHEN h.frequency = 'daily' THEN 'daily' ELSE 'x_per_week' END,
+          CASE WHEN h.frequency = 'daily' THEN 7 ELSE 1 END,
+          COALESCE(h.streak, 0),
+          COALESCE(h.best_streak, 0),
+          h.last_completed,
+          (h.archived_at IS NULL),
+          h.created_at
+        FROM habits h
+        WHERE NOT EXISTS (
+          SELECT 1 FROM recurring_goals rg
+          WHERE rg.user_id = h.user_id AND rg.title = h.name
+        )
+        ON CONFLICT DO NOTHING;
+      `);
+    } catch (e) {
+      // Habits table may be empty or unpopulated, which is fine
+    }
+
     // Daily archives table
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_archives (

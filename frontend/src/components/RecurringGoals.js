@@ -63,7 +63,7 @@ function RecurringGoals({ onTasksGenerated }) {
       loadGoals();
     } catch (error) {
       console.error('Failed to add goal:', error);
-      alert('Failed to add goal');
+      alert(error.response?.data?.error || 'Failed to add goal. Please try again.');
     }
   };
 
@@ -114,15 +114,6 @@ function RecurringGoals({ onTasksGenerated }) {
         <div>
           <h3>Recurring Goals</h3>
           <p className="recurring-goals-subtitle">Auto-generates tasks based on your schedule</p>
-        </div>
-        <div className="recurring-goals-actions">
-          <button
-            className="btn-generate-today"
-            onClick={handleGenerateTasks}
-            disabled={generating}
-          >
-            {generating ? '⏳' : '✨'} Generate Today's Tasks
-          </button>
         </div>
       </div>
 
@@ -194,6 +185,12 @@ function RecurringGoals({ onTasksGenerated }) {
             placeholder="Goal title (e.g., Go running)"
             value={newGoal.title}
             onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddGoal(e);
+              }
+            }}
             autoFocus
           />
           <select

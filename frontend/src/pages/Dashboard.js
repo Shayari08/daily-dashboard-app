@@ -52,12 +52,13 @@ function Dashboard() {
   };
 
   const handleAddTask = async (e) => {
-    e.preventDefault();
-    if (!newTask.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const taskTitle = newTask.trim();
+    if (!taskTitle) return;
     
     try {
       await axios.post('/api/tasks', { 
-        title: newTask,
+        title: taskTitle,
         status: 'pending'
       }, { withCredentials: true });
       
@@ -65,6 +66,7 @@ function Dashboard() {
       loadData();
     } catch (error) {
       console.error('Failed to create task:', error);
+      alert(error.response?.data?.error || 'Failed to create task. Please try again.');
     }
   };
 
@@ -286,8 +288,15 @@ function Dashboard() {
                   placeholder="Add a new task..."
                   value={newTask}
                   onChange={(e) => setNewTask(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTask(e);
+                    }
+                  }}
                   className="add-task-input"
                 />
+                <button type="submit" style={{ display: 'none' }} aria-hidden="true">Add</button>
               </form>
 
               {/* AI Task Generation */}

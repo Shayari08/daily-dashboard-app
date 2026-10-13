@@ -269,8 +269,8 @@ function fallbackAnalyzeGoalsText(goalsText) {
     analysis.suggestedCategories.push('Personal Growth');
     analysis.suggestedTasks.push(
       'Start daily journaling practice',
-      'Read 20 pages of a personal development book daily',
-      'Set weekly reflection time'
+      'Read 20 pages of a personal development book today',
+      'Write a 10-minute reflection on today\'s achievements and learnings'
     );
   }
 
@@ -446,15 +446,49 @@ async function fallbackGenerateInitialTasks(client, userId, goals, focusAreas, t
     }
   }
 
-  // Focus area tasks — use readable labels
+  // Specific actionable daily tasks for selected focus areas (15-45 min, concrete verbs)
   if (focusAreas && focusAreas.length > 0) {
+    const focusAreaSpecificTasks = {
+      'health': [
+        { title: 'Do a 20-minute bodyweight workout or brisk walk', description: 'Quick physical activity session for today', category: 'Health & Fitness' },
+        { title: 'Drink 8 glasses of water throughout the day', description: 'Stay hydrated with a glass every 1-2 hours', category: 'Health & Fitness' }
+      ],
+      'career': [
+        { title: 'Complete 1 lesson or tutorial in your current course', description: 'Dedicated 30-minute study block', category: 'Career & Learning' },
+        { title: 'Read 15 pages of a professional or technical book', description: 'Focused learning reading session', category: 'Career & Learning' }
+      ],
+      'productivity': [
+        { title: 'Define top 3 priority tasks and tackle them first', description: 'Identify highest-impact items to do before midday', category: 'Productivity' },
+        { title: 'Organize workspace and clear desktop for 15 mins', description: 'Set up an uncluttered work environment', category: 'Productivity' }
+      ],
+      'finance': [
+        { title: 'Review bank transactions from the past 7 days', description: 'Log expenses and check recent account balances', category: 'Finance' },
+        { title: 'Audit monthly subscriptions and cancel any unused ones', description: 'Find and eliminate unwanted recurring charges', category: 'Finance' }
+      ],
+      'relationships': [
+        { title: 'Send a thoughtful message or call a close friend or family member', description: 'Meaningful 15-minute connection check-in', category: 'Relationships' }
+      ],
+      'creativity': [
+        { title: 'Spend 20 minutes sketching, writing, or brainstorming ideas', description: 'Free-form creative exploration session', category: 'Creativity' }
+      ],
+      'mindfulness': [
+        { title: 'Complete a 10-minute breathwork or meditation session', description: 'Calm and center yourself with quiet breathing', category: 'Mindfulness' },
+        { title: 'Write down 3 specific things you are grateful for today', description: 'Quick gratitude practice', category: 'Mindfulness' }
+      ]
+    };
+
     for (const area of focusAreas) {
-      const label = focusAreaToCategory[area] || area;
+      const specificList = focusAreaSpecificTasks[area] || [
+        { title: `Complete a 30-minute focused action towards ${focusAreaToCategory[area] || area}`, description: 'Dedicated progress block for today', category: focusAreaToCategory[area] || 'General' }
+      ];
+
+      // Insert first specific task for each selected area
+      const taskDef = specificList[0];
       const areaTask = await client.query(
-        `INSERT INTO tasks (user_id, title, description, status, created_by)
-         VALUES ($1, $2, $3, 'pending', 'ai')
+        `INSERT INTO tasks (user_id, title, description, category, status, created_by)
+         VALUES ($1, $2, $3, $4, 'pending', 'ai')
          RETURNING *`,
-        [userId, `Focus on ${label}`, `Dedicate time to improving ${label}`]
+        [userId, taskDef.title, taskDef.description, taskDef.category]
       );
       tasks.push(areaTask.rows[0]);
     }
@@ -533,10 +567,10 @@ async function generateInitialHabits(client, userId, dailyRoutine, preferences, 
         const freq = habitData.frequency === 'daily' ? 'daily' : 'x_per_week';
         const timesPerWeek = habitData.frequency === 'daily' ? 7 : 1;
         const habitResult = await client.query(
-          `INSERT INTO recurring_goals (user_id, title, frequency, times_per_week, streak, best_streak, week_start_date)
-           VALUES ($1, $2, $3, $4, 0, 0, CURRENT_DATE)
+          `INSERT INTO recurring_goals (user_id, title, category, frequency, times_per_week, streak, best_streak, is_active, week_start_date)
+           VALUES ($1, $2, $3, $4, $5, 0, 0, true, CURRENT_DATE)
            RETURNING *`,
-          [userId, habitData.name, freq, timesPerWeek]
+          [userId, habitData.name, habitData.category || 'Habit', freq, timesPerWeek]
         );
         habits.push(habitResult.rows[0]);
       }
@@ -564,8 +598,8 @@ async function fallbackGenerateInitialHabits(client, userId, dailyRoutine, prefe
     const freq = frequency === 'daily' ? 'daily' : 'x_per_week';
     const timesPerWeek = frequency === 'daily' ? 7 : 1;
     const result = await client.query(
-      `INSERT INTO recurring_goals (user_id, title, frequency, times_per_week, streak, best_streak, week_start_date)
-       VALUES ($1, $2, $3, $4, 0, 0, CURRENT_DATE)
+      `INSERT INTO recurring_goals (user_id, title, category, frequency, times_per_week, streak, best_streak, is_active, week_start_date)
+       VALUES ($1, $2, 'Habit', $3, $4, 0, 0, true, CURRENT_DATE)
        RETURNING *`,
       [userId, name, freq, timesPerWeek]
     );
