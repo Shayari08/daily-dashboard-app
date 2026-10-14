@@ -1,6 +1,10 @@
-import './Login.css';
+import React from 'react';
+import { useTheme } from '../context/ThemeContext';
+import '../styles/Login.css';
 
 function Login() {
+  const { theme, toggleTheme } = useTheme();
+
   const handleGoogleLogin = () => {
     const apiBase = process.env.REACT_APP_API_URL || '';
     window.location.href = `${apiBase}/api/auth/google`;
@@ -8,8 +12,17 @@ function Login() {
 
   return (
     <div className="login-warm">
+      <button
+        className="btn-icon btn-theme-toggle login-theme-toggle"
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Night Mode'}
+        aria-label="Toggle light or night theme"
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+
       <div className="login-container-warm">
-        {/* Decorative Elements */}
+        {/* Subtle Decorative Ambient Lighting */}
         <div className="login-decoration login-decoration-1"></div>
         <div className="login-decoration login-decoration-2"></div>
         <div className="login-decoration login-decoration-3"></div>
@@ -19,7 +32,7 @@ function Login() {
           <div className="login-icon">✨</div>
           <h1 className="login-title">Daily Dashboard</h1>
           <p className="login-subtitle">
-            Your gentle companion for mindful productivity
+            Your mindful companion for adaptive productivity
           </p>
         </div>
 

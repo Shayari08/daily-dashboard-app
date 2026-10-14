@@ -128,7 +128,7 @@ function Chatbot({ onClose }) {
           <button className="btn-chat-control" onClick={handleDeleteChat} title="Delete History">
             🗑️
           </button>
-          <button className="btn-close-chat" onClick={onClose}>
+          <button className="btn-close-chat" onClick={onClose} title="Close Assistant" aria-label="Close Assistant">
             ✕
           </button>
         </div>

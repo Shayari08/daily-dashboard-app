@@ -1,107 +1,104 @@
-/* ================================================
-   RECURRING GOALS COMPONENT
-   ================================================ */
+/* ==========================================================================
+   RECURRING GOALS - MINIMALIST PREMIUM DESIGN (LIGHT & DARK MODE)
+   ========================================================================== */
 
 .recurring-goals-container {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 24px;
-  border: 2px solid rgba(217, 119, 87, 0.1);
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.75rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
 }
 
 .recurring-goals-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .recurring-goals-header h3 {
-  font-size: 20px;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: #2D2D2D;
-  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem 0;
 }
 
 .recurring-goals-subtitle {
-  font-size: 14px;
-  color: #9B9690;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
   margin: 0;
 }
 
-.recurring-goals-actions {
-  display: flex;
-  gap: 12px;
+/* Empty State */
+.recurring-goals-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  background-color: var(--bg-surface-hover);
 }
 
-.btn-generate-today {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #E8B86D 0%, #D97757 100%);
-  border: none;
-  border-radius: 10px;
-  color: white;
-  font-size: 14px;
+.recurring-goals-empty p {
+  font-size: 0.9375rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(232, 184, 109, 0.3);
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
 }
 
-.btn-generate-today:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(232, 184, 109, 0.4);
-}
-
-.btn-generate-today:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.recurring-goals-empty span {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
 
 /* Goals List */
 .recurring-goals-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
 }
 
 .recurring-goal-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: #FAF8F5;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
+  gap: 1rem;
+  padding: 0.875rem 1.125rem;
+  background-color: var(--bg-surface-hover);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
 }
 
 .recurring-goal-card:hover {
-  border-color: rgba(217, 119, 87, 0.2);
+  border-color: var(--border-strong);
+  background-color: var(--bg-surface-active);
 }
 
 .recurring-goal-card.due-today {
-  background: linear-gradient(135deg, rgba(217, 119, 87, 0.08) 0%, rgba(232, 184, 109, 0.08) 100%);
-  border-color: rgba(217, 119, 87, 0.2);
+  border-left: 3px solid var(--primary);
 }
 
 .goal-info {
   flex: 1;
+  min-width: 0;
 }
 
 .goal-title {
-  font-size: 16px;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: #2D2D2D;
-  margin-bottom: 4px;
+  color: var(--text-primary);
+  line-height: 1.3;
 }
 
 .goal-frequency {
-  font-size: 13px;
-  color: #9B9690;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
   font-weight: 500;
 }
 
@@ -109,235 +106,152 @@
 .goal-progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 100px;
+  gap: 0.5rem;
 }
 
 .progress-text {
-  font-size: 14px;
-  font-weight: 700;
-  color: #D97757;
-  min-width: 40px;
-  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .progress-bar-mini {
-  width: 60px;
+  width: 50px;
   height: 6px;
-  background: rgba(217, 119, 87, 0.15);
-  border-radius: 10px;
+  background-color: var(--border);
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .progress-fill-mini {
   height: 100%;
-  background: linear-gradient(90deg, #D97757 0%, #E8B86D 100%);
-  border-radius: 10px;
+  background-color: var(--primary);
+  border-radius: var(--radius-full);
   transition: width 0.3s ease;
 }
 
-/* Goal Actions */
+/* Actions */
 .goal-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.btn-complete-goal {
-  padding: 6px 14px;
-  background: linear-gradient(135deg, #7A9B76 0%, #95B891 100%);
-  color: white;
-  font-size: 13px;
-  font-weight: 700;
-  border: none;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn-complete-goal:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(122, 155, 118, 0.3);
+  gap: 0.5rem;
 }
 
 .completed-badge {
-  padding: 4px 10px;
-  background: rgba(122, 155, 118, 0.1);
-  color: #7A9B76;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 20px;
-  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--success);
+  background-color: var(--success-subtle);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.btn-complete-goal {
+  padding: 0.35rem 0.75rem;
+  background-color: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-complete-goal:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
 }
 
 .btn-delete-goal {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(217, 119, 87, 0.1);
-  color: #D97757;
-  font-size: 14px;
-  cursor: pointer;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: all 0.2s ease;
-}
-
-.recurring-goal-card:hover .btn-delete-goal {
-  opacity: 1;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .btn-delete-goal:hover {
-  background: rgba(217, 119, 87, 0.2);
+  color: var(--danger);
+  background-color: var(--danger-subtle);
 }
 
-/* Empty State */
-.recurring-goals-empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #9B9690;
-}
-
-.recurring-goals-empty p {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.recurring-goals-empty span {
-  font-size: 14px;
-}
-
-/* Add Goal Button */
+/* Add Goal Button & Form */
 .btn-add-goal {
   width: 100%;
-  padding: 14px;
-  background: transparent;
-  border: 2px dashed rgba(217, 119, 87, 0.3);
-  border-radius: 12px;
-  color: #D97757;
-  font-size: 15px;
+  padding: 0.625rem;
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .btn-add-goal:hover {
-  background: rgba(217, 119, 87, 0.05);
-  border-color: #D97757;
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-subtle);
 }
 
-/* Add Goal Form */
 .add-goal-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  background: #FAF8F5;
-  border-radius: 12px;
-  border: 2px solid rgba(217, 119, 87, 0.2);
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bg-surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .add-goal-form input,
 .add-goal-form select {
-  padding: 12px 16px;
-  border: 2px solid rgba(217, 119, 87, 0.2);
-  border-radius: 10px;
-  font-size: 15px;
-  color: #2D2D2D;
-  background: white;
-  transition: all 0.2s ease;
-}
-
-.add-goal-form input:focus,
-.add-goal-form select:focus {
-  outline: none;
-  border-color: #D97757;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
 }
 
 .form-buttons {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .btn-save-goal {
-  flex: 1;
-  padding: 12px;
-  background: linear-gradient(135deg, #D97757 0%, #E8B86D 100%);
+  padding: 0.5rem 1rem;
+  background-color: var(--primary);
+  color: #ffffff;
   border: none;
-  border-radius: 10px;
-  color: white;
-  font-size: 15px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .btn-save-goal:hover {
-  transform: translateY(-2px);
+  background-color: var(--primary-hover);
 }
 
 .btn-cancel {
-  padding: 12px 20px;
-  background: white;
-  border: 2px solid rgba(217, 119, 87, 0.2);
-  border-radius: 10px;
-  color: #2D2D2D;
-  font-size: 15px;
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .btn-cancel:hover {
-  border-color: #D97757;
-}
-
-/* Loading */
-.recurring-goals-loading {
-  display: flex;
-  justify-content: center;
-  padding: 40px;
-}
-
-.recurring-goals-loading .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(217, 119, 87, 0.2);
-  border-top-color: #D97757;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-  .recurring-goals-header {
-    flex-direction: column;
-  }
-
-  .recurring-goals-actions {
-    width: 100%;
-  }
-
-  .btn-generate-today {
-    width: 100%;
-  }
-
-  .recurring-goal-card {
-    flex-wrap: wrap;
-  }
-
-  .goal-progress {
-    width: 100%;
-    margin-top: 8px;
-  }
+  background-color: var(--bg-surface-active);
+  color: var(--text-primary);
 }

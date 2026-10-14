@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onToggleChat }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
@@ -83,6 +85,14 @@ function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onTo
         </div>
 
         <div className="header-actions">
+          <button
+            className="btn-icon btn-theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Night Mode'}
+            aria-label="Toggle light or night theme"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           {onDailyReset && (
             <button
               className="btn-icon"
@@ -215,23 +225,12 @@ function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onTo
                     value={deleteInput}
                     onChange={(e) => { setDeleteInput(e.target.value); setDeleteError(''); }}
                     placeholder="Type DELETE here"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '2px solid rgba(217, 119, 87, 0.2)',
-                      borderRadius: '10px',
-                      fontSize: '15px',
-                      marginTop: '8px',
-                      fontFamily: 'inherit',
-                      background: 'var(--cream)',
-                      color: 'var(--charcoal)',
-                      outline: 'none',
-                    }}
+                    style={{ marginTop: '8px' }}
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleDeleteStep1()}
                   />
                   {deleteError && (
-                    <p style={{ color: '#C96847', fontSize: '13px', marginTop: '8px' }}>{deleteError}</p>
+                    <p style={{ color: 'var(--danger)', fontSize: '0.8125rem', marginTop: '8px', fontWeight: 500 }}>{deleteError}</p>
                   )}
                 </>
               ) : (
@@ -240,7 +239,7 @@ function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onTo
                     Are you <strong>absolutely sure</strong>? Every task, habit, and insight will be gone forever.
                   </p>
                   {deleteError && (
-                    <p style={{ color: '#C96847', fontSize: '13px', marginTop: '8px' }}>{deleteError}</p>
+                    <p style={{ color: 'var(--danger)', fontSize: '0.8125rem', marginTop: '8px', fontWeight: 500 }}>{deleteError}</p>
                   )}
                 </>
               )}
@@ -249,17 +248,15 @@ function Navbar({ user, activeView, setActiveView, taskCount, onDailyReset, onTo
               <button className="btn-secondary" onClick={closeDeleteModal}>Cancel</button>
               {deleteStep === 1 ? (
                 <button
-                  className="btn-primary"
+                  className="btn-danger"
                   onClick={handleDeleteStep1}
-                  style={{ background: '#C96847' }}
                 >
                   Continue
                 </button>
               ) : (
                 <button
-                  className="btn-primary"
+                  className="btn-danger"
                   onClick={handleDeleteConfirm}
-                  style={{ background: '#C96847' }}
                 >
                   Delete My Account
                 </button>

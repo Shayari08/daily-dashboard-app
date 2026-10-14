@@ -1,373 +1,246 @@
-/* ================================================
-   RECOMMENDATIONS VIEW
-   ================================================ */
+/* ==========================================================================
+   RECOMMENDATIONS - MINIMALIST PREMIUM DESIGN (LIGHT & DARK MODE)
+   ========================================================================== */
 
 .recommendations-view {
-  padding: 0;
+  width: 100%;
 }
 
-/* Header */
 .recommendations-header {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 20px;
+  margin-bottom: 1.5rem;
 }
 
 .btn-regenerate {
-  padding: 10px 20px;
-  border: 2px solid rgba(217, 119, 87, 0.2);
-  border-radius: 10px;
-  background: white;
-  color: #2D2D2D;
-  font-size: 14px;
+  padding: 0.55rem 1.125rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
+  transition: all var(--transition-fast);
 }
 
 .btn-regenerate:hover:not(:disabled) {
-  border-color: #D97757;
-  background: rgba(217, 119, 87, 0.05);
-}
-
-.btn-regenerate:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-strong);
 }
 
 /* Empty State */
 .recommendations-empty {
   text-align: center;
-  padding: 60px 20px;
+  padding: 4rem 1.5rem;
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .empty-icon-recs {
-  font-size: 56px;
-  margin-bottom: 16px;
+  font-size: 3rem;
+  margin-bottom: 1rem;
 }
 
 .recommendations-empty p {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2D2D2D;
-  margin: 0 0 8px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 .recommendations-empty span {
-  font-size: 14px;
-  color: #9B9690;
+  font-size: 0.875rem;
+  color: var(--text-muted);
   display: block;
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .btn-generate-first {
-  padding: 14px 28px;
-  background: linear-gradient(135deg, #E8B86D 0%, #D97757 100%);
+  padding: 0.75rem 1.5rem;
+  background-color: var(--primary);
+  color: #ffffff;
   border: none;
-  border-radius: 12px;
-  color: white;
-  font-size: 16px;
-  font-weight: 700;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(232, 184, 109, 0.3);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .btn-generate-first:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(232, 184, 109, 0.4);
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
-.btn-generate-first:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Card Grid */
+/* Recommendations Grid */
 .recommendations-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1.25rem;
 }
 
-/* Recommendation Card */
+/* Card */
 .recommendation-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  border: 2px solid rgba(217, 119, 87, 0.1);
-  transition: all 0.3s ease;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
 }
 
 .recommendation-card:hover {
-  box-shadow: 0 8px 24px rgba(217, 119, 87, 0.15);
-  border-color: rgba(217, 119, 87, 0.3);
-  transform: translateY(-4px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
 }
 
 .recommendation-card.liked {
-  border-color: #7A9B76;
-  background: rgba(122, 155, 118, 0.03);
+  border-color: var(--success);
 }
 
 .recommendation-card.disliked {
-  opacity: 0.55;
-  border-color: rgba(155, 150, 144, 0.2);
+  opacity: 0.6;
 }
 
-.recommendation-card.disliked:hover {
-  opacity: 0.8;
-}
-
-/* Type Badge */
 .rec-type-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: rgba(232, 184, 109, 0.12);
-  border-radius: 20px;
-  margin-bottom: 12px;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--primary);
+  background-color: var(--primary-subtle);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  margin-bottom: 0.75rem;
   align-self: flex-start;
 }
 
-.rec-type-icon {
-  font-size: 14px;
-}
-
-.rec-type-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #D97757;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Card Content */
 .rec-title {
-  font-size: 17px;
+  font-size: 1rem;
   font-weight: 700;
-  color: #2D2D2D;
-  margin: 0 0 6px 0;
-  line-height: 1.3;
+  color: var(--text-primary);
+  line-height: 1.35;
+  margin-bottom: 0.25rem;
 }
 
 .rec-source {
-  font-size: 13px;
-  color: #9B9690;
+  font-size: 0.8125rem;
   font-weight: 500;
-  margin-bottom: 10px;
+  color: var(--text-muted);
+  margin-bottom: 0.625rem;
 }
 
 .rec-description {
-  font-size: 14px;
-  color: #2D2D2D;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
   line-height: 1.5;
-  margin: 0 0 12px 0;
+  margin-bottom: 0.875rem;
   flex: 1;
 }
 
 .rec-relevance {
-  font-size: 13px;
-  color: #7A9B76;
-  font-weight: 500;
-  padding: 8px 12px;
-  background: rgba(122, 155, 118, 0.08);
-  border-radius: 8px;
-  margin-bottom: 16px;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  line-height: 1.4;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background-color: var(--bg-surface-hover);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-subtle);
 }
 
-.relevance-icon {
-  flex-shrink: 0;
-}
-
-/* Action Bar */
+/* Card Actions */
 .rec-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(217, 119, 87, 0.1);
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: auto;
 }
 
 .btn-search-link {
-  padding: 8px 14px;
-  background: rgba(217, 119, 87, 0.08);
-  border-radius: 8px;
-  color: #D97757;
-  font-size: 13px;
+  font-size: 0.75rem;
   font-weight: 600;
-  text-decoration: none;
-  transition: all 0.2s ease;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
 }
 
 .btn-search-link:hover {
-  background: rgba(217, 119, 87, 0.15);
-  color: #C96847;
+  background-color: var(--bg-surface-active);
+  color: var(--text-primary);
 }
 
-/* Reaction Buttons */
 .rec-reaction-buttons {
   display: flex;
-  gap: 4px;
-  margin-left: auto;
+  gap: 0.25rem;
 }
 
 .btn-react {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background: rgba(155, 150, 144, 0.08);
-  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  font-size: 0.75rem;
+  transition: all var(--transition-fast);
 }
 
 .btn-react:hover {
-  background: rgba(155, 150, 144, 0.15);
-  transform: scale(1.1);
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
 }
 
-.btn-like.active {
-  background: rgba(122, 155, 118, 0.15);
-  border-color: #7A9B76;
+.btn-react.active {
+  background-color: var(--primary-subtle);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
-.btn-dislike.active {
-  background: rgba(217, 119, 87, 0.1);
-  border-color: #D97757;
-}
-
-/* Add to Tasks Button */
 .btn-add-to-tasks {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 2px solid rgba(122, 155, 118, 0.3);
-  background: white;
-  color: #7A9B76;
-  font-size: 13px;
+  margin-left: auto;
+  font-size: 0.75rem;
   font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--primary);
+  color: #ffffff;
+  border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .btn-add-to-tasks:hover:not(:disabled) {
-  background: rgba(122, 155, 118, 0.08);
-  border-color: #7A9B76;
+  background-color: var(--primary-hover);
 }
 
 .btn-add-to-tasks.added {
-  background: rgba(122, 155, 118, 0.1);
-  border-color: #7A9B76;
-  color: #6B9462;
+  background-color: var(--success-subtle);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   cursor: default;
-}
-
-.btn-add-to-tasks:disabled {
-  opacity: 0.7;
-}
-
-/* Footer */
-.recommendations-footer {
-  text-align: center;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 2px solid rgba(217, 119, 87, 0.1);
-}
-
-.recommendations-footer p {
-  font-size: 14px;
-  color: #9B9690;
-  margin: 0 0 12px 0;
-}
-
-.btn-regenerate-secondary {
-  padding: 12px 24px;
-  border: 2px solid rgba(217, 119, 87, 0.2);
-  border-radius: 10px;
-  background: white;
-  color: #2D2D2D;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-regenerate-secondary:hover:not(:disabled) {
-  border-color: #D97757;
-  background: rgba(217, 119, 87, 0.05);
-  transform: translateY(-2px);
-}
-
-.btn-regenerate-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Loading */
-.recommendations-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  text-align: center;
-}
-
-.recommendations-loading .loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(217, 119, 87, 0.2);
-  border-top-color: #D97757;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
-}
-
-.recommendations-loading p {
-  font-size: 16px;
-  color: #9B9690;
-  margin: 0;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .recommendations-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .recommendations-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .rec-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .rec-reaction-buttons {
-    margin-left: 0;
-    justify-content: center;
-  }
-
-  .btn-search-link,
-  .btn-add-to-tasks {
-    text-align: center;
-  }
 }

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import '../styles/Onboarding.css';
 
 function Onboarding() {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -63,13 +65,13 @@ function Onboarding() {
   };
 
   const focusAreaOptions = [
-    { id: 'health', label: 'Health & Fitness', icon: '🏃', color: '#7A9B76' },
-    { id: 'career', label: 'Career & Learning', icon: '📚', color: '#E8B86D' },
-    { id: 'productivity', label: 'Productivity', icon: '🎯', color: '#D97757' },
-    { id: 'relationships', label: 'Relationships', icon: '❤️', color: '#C96847' },
-    { id: 'creativity', label: 'Creativity', icon: '🎨', color: '#9B9690' },
-    { id: 'finance', label: 'Finance', icon: '💰', color: '#6B9462' },
-    { id: 'mindfulness', label: 'Mindfulness', icon: '🧘', color: '#FAF8F5' }
+    { id: 'health', label: 'Health & Fitness', icon: '🏃', color: '#10b981' },
+    { id: 'career', label: 'Career & Learning', icon: '📚', color: '#f59e0b' },
+    { id: 'productivity', label: 'Productivity', icon: '🎯', color: '#3b82f6' },
+    { id: 'relationships', label: 'Relationships', icon: '❤️', color: '#ec4899' },
+    { id: 'creativity', label: 'Creativity', icon: '🎨', color: '#8b5cf6' },
+    { id: 'finance', label: 'Finance', icon: '💰', color: '#06b6d4' },
+    { id: 'mindfulness', label: 'Mindfulness', icon: '🧘', color: '#6366f1' }
   ];
 
   const handleFocusAreaToggle = (areaId) => {
@@ -493,6 +495,15 @@ function Onboarding() {
 
   return (
     <div className="onboarding-container">
+      <button
+        className="btn-icon btn-theme-toggle onboarding-theme-toggle"
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Night Mode'}
+        aria-label="Toggle light or night theme"
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+
       {/* Progress Bar */}
       <div className="onboarding-progress">
         <div className="progress-bar">

@@ -1,116 +1,127 @@
-/* ================================================
-   WARM LOGIN PAGE - Matches Dashboard Aesthetic
-   ================================================ */
+/* ==========================================================================
+   LOGIN - MINIMALIST PREMIUM DESIGN (LIGHT & DARK MODE)
+   ========================================================================== */
 
 .login-warm {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FAF8F5 0%, #F5E6D8 100%);
+  background-color: var(--bg-app);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 1.5rem;
   position: relative;
   overflow: hidden;
 }
 
-/* Soft Decorative Elements */
+/* Subtle Ambient Lighting */
 .login-decoration {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.08;
+  filter: blur(80px);
   pointer-events: none;
 }
 
 .login-decoration-1 {
-  width: 400px;
-  height: 400px;
-  background: #D97757;
-  top: -100px;
-  right: -100px;
-  animation: float 20s ease-in-out infinite;
+  width: 380px;
+  height: 380px;
+  background: var(--primary-subtle);
+  top: -80px;
+  right: -80px;
+  animation: ambientFloat 18s ease-in-out infinite;
 }
 
 .login-decoration-2 {
-  width: 300px;
-  height: 300px;
-  background: #7A9B76;
-  bottom: -80px;
-  left: -80px;
-  animation: float 25s ease-in-out infinite reverse;
+  width: 320px;
+  height: 320px;
+  background: var(--accent-subtle);
+  bottom: -60px;
+  left: -60px;
+  animation: ambientFloat 22s ease-in-out infinite reverse;
 }
 
 .login-decoration-3 {
-  width: 200px;
-  height: 200px;
-  background: #E8B86D;
-  top: 50%;
-  left: 10%;
-  animation: float 30s ease-in-out infinite;
+  width: 220px;
+  height: 220px;
+  background: var(--info-subtle);
+  top: 45%;
+  left: 12%;
+  animation: ambientFloat 26s ease-in-out infinite;
 }
 
-@keyframes float {
+@keyframes ambientFloat {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -30px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
+  50% { transform: translate(25px, -25px) scale(1.08); }
 }
 
-/* Main Container */
+/* Floating Theme Toggle on Login */
+.login-theme-toggle {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 20;
+}
+
+/* Main Container Card */
 .login-container-warm {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 32px;
-  padding: 60px 50px;
-  max-width: 480px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 3rem 2.5rem;
+  max-width: 460px;
   width: 100%;
-  box-shadow: 
-    0 10px 40px rgba(217, 119, 87, 0.1),
-    0 2px 8px rgba(45, 45, 45, 0.05);
+  box-shadow: var(--shadow-modal);
   position: relative;
-  border: 2px solid rgba(217, 119, 87, 0.1);
-  animation: slideUp 0.6s ease-out;
+  z-index: 10;
+  animation: loginSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
 }
 
-@keyframes slideUp {
+@keyframes loginSlideUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(18px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 /* Branding */
 .login-brand {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 2.25rem;
 }
 
 .login-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  animation: pulse 3s ease-in-out infinite;
+  font-size: 2.75rem;
+  margin-bottom: 0.75rem;
+  display: inline-block;
+  animation: iconPulse 3s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes iconPulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  50% { transform: scale(1.06); }
 }
 
 .login-title {
-  font-size: 36px;
+  font-size: 2rem;
   font-weight: 800;
-  color: #D97757;
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
 }
 
 .login-subtitle {
-  font-size: 16px;
-  color: #9B9690;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
   font-weight: 500;
-  line-height: 1.6;
+  line-height: 1.55;
   max-width: 320px;
   margin: 0 auto;
 }
@@ -118,130 +129,97 @@
 /* Google Login Button */
 .google-login-btn-warm {
   width: 100%;
-  padding: 18px 32px;
-  background: linear-gradient(135deg, #D97757 0%, #C96847 100%);
-  border: none;
-  border-radius: 16px;
-  color: white;
-  font-size: 16px;
+  padding: 0.875rem 1.25rem;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
   font-weight: 600;
+  font-family: var(--font-sans);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 
-    0 4px 12px rgba(217, 119, 87, 0.3),
-    0 2px 4px rgba(217, 119, 87, 0.2);
-  margin-bottom: 32px;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
+  margin-bottom: 2rem;
   position: relative;
   overflow: hidden;
 }
 
-.google-login-btn-warm::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.google-login-btn-warm:hover::before {
-  left: 100%;
-}
-
 .google-login-btn-warm:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 6px 20px rgba(217, 119, 87, 0.4),
-    0 3px 6px rgba(217, 119, 87, 0.3);
+  background-color: var(--bg-surface-hover);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .google-login-btn-warm:active {
   transform: translateY(0);
-  box-shadow: 
-    0 2px 8px rgba(217, 119, 87, 0.3),
-    0 1px 2px rgba(217, 119, 87, 0.2);
 }
 
 .google-icon {
   flex-shrink: 0;
-  background: white;
-  border-radius: 8px;
-  padding: 4px;
+  width: 20px;
+  height: 20px;
 }
 
-/* Features List */
+/* Features Grid */
 .login-features-warm {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
 }
 
 .feature-warm {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(217, 119, 87, 0.05) 0%, rgba(122, 155, 118, 0.05) 100%);
-  border-radius: 12px;
-  font-size: 14px;
-  color: #2D2D2D;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  background-color: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
   font-weight: 500;
-  border: 1px solid rgba(217, 119, 87, 0.1);
-  transition: all 0.3s ease;
+  transition: all var(--transition-fast);
 }
 
 .feature-warm:hover {
-  background: rgba(217, 119, 87, 0.08);
-  border-color: rgba(217, 119, 87, 0.2);
-  transform: translateY(-2px);
+  background-color: var(--bg-surface-active);
+  border-color: var(--border);
+  color: var(--text-primary);
+  transform: translateY(-1px);
 }
 
 .feature-icon {
-  font-size: 20px;
+  font-size: 1.15rem;
   flex-shrink: 0;
 }
 
 /* Footer */
 .login-footer-warm {
   text-align: center;
-  font-size: 13px;
-  color: #9B9690;
+  font-size: 0.75rem;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 /* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .login-container-warm {
-    padding: 40px 30px;
+    padding: 2.25rem 1.5rem;
   }
 
   .login-title {
-    font-size: 28px;
-  }
-
-  .login-subtitle {
-    font-size: 14px;
+    font-size: 1.75rem;
   }
 
   .login-features-warm {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 0.5rem;
   }
-
-  .google-login-btn-warm {
-    font-size: 15px;
-    padding: 16px 28px;
-  }
-}
-
-/* Smooth Transitions */
-* {
-  transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }

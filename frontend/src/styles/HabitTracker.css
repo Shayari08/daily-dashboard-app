@@ -1,17 +1,18 @@
-/* ================================================
-   BEAUTIFUL HABIT TRACKER
-   ================================================ */
+/* ==========================================================================
+   HABIT TRACKER - MINIMALIST PREMIUM DESIGN (LIGHT & DARK MODE)
+   ========================================================================== */
 
 .habit-tracker-beautiful {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 2px 8px rgba(45, 45, 45, 0.08);
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
 }
 
 .habit-count {
-  font-size: 14px;
-  color: #9B9690;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -20,29 +21,29 @@
    ================================================ */
 
 .add-habit-form-beautiful {
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
 }
 
 .habit-input-group-beautiful {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  background: #FAF8F5;
-  border: 2px solid #E8E6E1;
-  border-radius: 14px;
-  transition: all 0.3s ease;
+  gap: 0.875rem;
+  padding: 0.875rem 1.125rem;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
 }
 
 .habit-input-group-beautiful:focus-within {
-  border-color: #7A9B76;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(122, 155, 118, 0.1);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-subtle);
+  background-color: var(--bg-input-focus);
 }
 
 .add-icon-habit {
-  font-size: 20px;
-  color: #7A9B76;
+  font-size: 1.1rem;
+  color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -50,321 +51,239 @@
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 16px;
-  color: #2D2D2D;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
   outline: none;
-  font-weight: 500;
+  padding: 0;
 }
 
-.add-habit-input-beautiful::placeholder {
-  color: #9B9690;
+.add-habit-input-beautiful:focus {
+  box-shadow: none;
+  border: none;
 }
 
 /* Frequency Picker */
 .frequency-picker-beautiful {
-  margin-top: 16px;
-  padding: 20px;
-  background: linear-gradient(135deg, rgba(122, 155, 118, 0.05) 0%, rgba(107, 148, 98, 0.05) 100%);
-  border-radius: 12px;
-  border: 2px solid rgba(122, 155, 118, 0.1);
+  margin-top: 0.875rem;
+  padding: 1rem;
+  background-color: var(--bg-surface-hover);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
 .frequency-label-beautiful {
   display: block;
-  font-size: 13px;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: #7A9B76;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.625rem;
 }
 
 .frequency-options-beautiful {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 0.625rem;
 }
 
 .frequency-btn-beautiful {
-  padding: 14px 20px;
-  border-radius: 12px;
-  border: 2px solid #E8E6E1;
-  background: white;
-  color: #2D2D2D;
-  font-size: 14px;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  gap: 0.35rem;
+  transition: all var(--transition-fast);
 }
 
 .frequency-btn-beautiful:hover {
-  border-color: #7A9B76;
-  background: rgba(122, 155, 118, 0.05);
-  transform: translateY(-2px);
+  background-color: var(--bg-surface-active);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .frequency-btn-beautiful.active {
-  border-color: #7A9B76;
-  background: linear-gradient(135deg, #7A9B76 0%, #6B9462 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(122, 155, 118, 0.3);
-  transform: scale(1.02);
+  background-color: var(--primary-subtle);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .freq-icon {
-  font-size: 24px;
+  font-size: 1.15rem;
 }
 
 .freq-label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 0.75rem;
 }
 
 /* ================================================
-   HABITS GRID
+   HABITS GRID & CARDS
    ================================================ */
 
 .habits-grid-beautiful {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
 }
 
-/* ================================================
-   HABIT CARD - Clean & Beautiful
-   ================================================ */
-
 .habit-card-beautiful {
-  background: linear-gradient(135deg, rgba(122, 155, 118, 0.03) 0%, rgba(107, 148, 98, 0.01) 100%);
-  border: 2px solid #E8E6E1;
-  border-radius: 20px;
-  padding: 28px 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  background-color: var(--bg-surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
+  position: relative;
+  transition: all var(--transition-fast);
 }
 
 .habit-card-beautiful:hover {
-  border-color: #7A9B76;
-  box-shadow: 
-    0 8px 24px rgba(122, 155, 118, 0.12),
-    0 4px 8px rgba(45, 45, 45, 0.05);
-  transform: translateY(-4px);
+  background-color: var(--bg-surface-active);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Delete Button */
+.habit-card-beautiful.completed {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
 .btn-delete-habit-beautiful {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  top: 0.625rem;
+  right: 0.625rem;
+  width: 26px;
+  height: 26px;
+  background: transparent;
   border: none;
-  background: rgba(217, 119, 87, 0.1);
-  color: #D97757;
-  font-size: 16px;
-  font-weight: bold;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-}
-
-.habit-card-beautiful:hover .btn-delete-habit-beautiful {
-  opacity: 1;
+  font-size: 0.875rem;
+  opacity: 0.6;
+  transition: all var(--transition-fast);
 }
 
 .btn-delete-habit-beautiful:hover {
-  background: #D97757;
-  color: white;
-  transform: rotate(90deg) scale(1.1);
+  opacity: 1;
+  color: var(--danger);
+  background-color: var(--danger-subtle);
 }
 
-/* Habit Icon */
 .habit-icon-beautiful {
-  font-size: 48px;
-  margin-bottom: 8px;
-  animation: float 3s ease-in-out infinite;
+  font-size: 2rem;
+  margin-bottom: 0.625rem;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-/* Habit Name */
 .habit-name-beautiful {
-  font-size: 20px;
+  font-size: 1rem;
   font-weight: 700;
-  color: #2D2D2D;
-  margin: 0;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
   line-height: 1.3;
-  max-width: 100%;
-  word-wrap: break-word;
 }
 
-/* Frequency Badge */
 .habit-frequency-beautiful {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 0.875rem;
+}
+
+.habit-streak-beautiful {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #7A9B76;
-  background: rgba(122, 155, 118, 0.12);
-  padding: 8px 16px;
-  border-radius: 20px;
-  margin: 4px 0;
-}
-
-/* Streak Display */
-.habit-streak-beautiful {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, rgba(232, 184, 109, 0.15) 0%, rgba(217, 119, 87, 0.15) 100%);
-  border-radius: 16px;
-  margin: 8px 0;
-  width: 100%;
-  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  background-color: var(--warning-subtle);
+  color: var(--warning-text);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.875rem;
 }
 
 .streak-flame {
-  font-size: 24px;
-  animation: flicker 2s ease-in-out infinite;
-}
-
-@keyframes flicker {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  font-size: 0.85rem;
 }
 
 .streak-number {
-  font-size: 28px;
   font-weight: 800;
-  color: #D97757;
-  line-height: 1;
 }
 
-.streak-label {
-  font-size: 13px;
-  color: #9B9690;
-  font-weight: 600;
-}
-
-/* Check In Button */
 .btn-checkin-beautiful {
   width: 100%;
-  padding: 16px 24px;
-  border-radius: 14px;
+  padding: 0.625rem 1rem;
+  background-color: var(--primary);
+  color: #ffffff;
   border: none;
-  background: linear-gradient(135deg, #7A9B76 0%, #6B9462 100%);
-  color: white;
-  font-size: 15px;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  box-shadow: 0 4px 12px rgba(122, 155, 118, 0.3);
-  margin-top: 8px;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+  margin-top: auto;
 }
 
-.btn-checkin-beautiful:hover {
-  background: linear-gradient(135deg, #6B9462 0%, #5A8352 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(122, 155, 118, 0.4);
+.btn-checkin-beautiful:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
 }
 
-.btn-checkin-beautiful:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: 0 2px 8px rgba(122, 155, 118, 0.3);
+.btn-checkin-beautiful.checked {
+  background-color: var(--success-subtle);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  cursor: default;
 }
 
-.checkin-icon {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.checkin-text {
-  font-size: 15px;
-  letter-spacing: 0.3px;
-}
-
-/* Total Completions */
 .habit-total-beautiful {
-  font-size: 12px;
-  color: #9B9690;
-  font-weight: 600;
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(232, 230, 225, 0.5);
-  width: 100%;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.625rem;
+  font-weight: 500;
 }
 
-/* ================================================
-   EMPTY STATE
-   ================================================ */
-
+/* Empty State */
 .empty-state-habits-beautiful {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 20px;
-  color: #9B9690;
+  padding: 3.5rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface-hover);
 }
 
 .empty-icon-habits {
-  font-size: 80px;
-  margin-bottom: 20px;
-  opacity: 0.5;
-  animation: float 3s ease-in-out infinite;
+  font-size: 2.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .empty-state-habits-beautiful p {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: #2D2D2D;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
 }
 
 .empty-state-habits-beautiful span {
-  font-size: 15px;
-  color: #9B9690;
-}
-
-/* ================================================
-   RESPONSIVE
-   ================================================ */
-
-@media (max-width: 768px) {
-  .habits-grid-beautiful {
-    grid-template-columns: 1fr;
-  }
-  
-  .frequency-options-beautiful {
-    grid-template-columns: 1fr;
-  }
-  
-  .habit-card-beautiful {
-    padding: 24px 20px;
-  }
-  
-  .btn-delete-habit-beautiful {
-    opacity: 1;
-  }
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
