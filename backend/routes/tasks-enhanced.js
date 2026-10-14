@@ -262,13 +262,17 @@ router.post('/:id/ai-breakdown', isAuthenticated, async (req, res) => {
     };
 
     // Generate subtasks using LLM
-    const breakdownResult = await llmService.breakdownTask(task, context);
+    let breakdownResult = await llmService.breakdownTask(task, context);
 
-    if (!breakdownResult.success) {
-      return res.status(500).json({
-        error: 'Failed to generate subtasks',
-        details: breakdownResult.error
-      });
+    if (!breakdownResult || !breakdownResult.success || !Array.isArray(breakdownResult.subtasks) || breakdownResult.subtasks.length === 0) {
+      const fallbackSubtasks = (typeof llmService.generateFallbackSubtasks === 'function')
+        ? llmService.generateFallbackSubtasks(task)
+        : [
+            { title: `Plan and outline: ${task.title}`, description: 'Clarify steps and required inputs', estimated_duration: 15 },
+            { title: `Execute core work: ${task.title}`, description: 'Focus on completing the main deliverable', estimated_duration: 30 },
+            { title: `Review and finalize: ${task.title}`, description: 'Check quality and mark done', estimated_duration: 15 }
+          ];
+      breakdownResult = { success: true, subtasks: fallbackSubtasks };
     }
 
     // Insert generated subtasks

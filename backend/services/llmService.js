@@ -2,7 +2,7 @@ const axios = require('axios');
 
 class LLMService {
   constructor() {
-    this.provider = process.env.LLM_PROVIDER || 'ollama'; // 'ollama' or 'huggingface' or 'groq'
+    this.provider = process.env.LLM_PROVIDER || (process.env.GROQ_API_KEY ? 'groq' : 'ollama'); // 'ollama' or 'huggingface' or 'groq'
     this.ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
     this.model = process.env.LLM_MODEL || 'llama3';
     this.hfToken = process.env.HUGGINGFACE_API_KEY;
@@ -10,9 +10,11 @@ class LLMService {
     this.fallbackEnabled = process.env.ENABLE_FALLBACK === 'true';
 
     // Onboarding-specific provider (can be different from main provider)
-    this.onboardingProvider = process.env.ONBOARDING_LLM_PROVIDER || 'groq';
+    this.onboardingProvider = process.env.ONBOARDING_LLM_PROVIDER || (process.env.GROQ_API_KEY ? 'groq' : 'ollama');
     this.groqApiKey = process.env.GROQ_API_KEY;
-    this.groqModel = process.env.GROQ_MODEL || 'llama-3.1-70b-versatile';
+    // Normalize deprecated 70b model name if set in legacy config
+    const configuredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    this.groqModel = configuredModel === 'llama-3.1-70b-versatile' ? 'llama-3.3-70b-versatile' : configuredModel;
   }
 
   async generateCompletion(prompt, options = {}) {
@@ -91,6 +93,11 @@ class LLMService {
   }
 
   async generateGroqCompletion(prompt, options = {}) {
+    if (!this.groqApiKey) {
+      console.warn('Groq API key not provided, using fallback');
+      return this.fallbackResponse();
+    }
+
     try {
       const messages = [];
       if (options.system) {
@@ -98,10 +105,12 @@ class LLMService {
       }
       messages.push({ role: 'user', content: prompt });
 
+      const modelToUse = (this.groqModel === 'llama-3.1-70b-versatile') ? 'llama-3.3-70b-versatile' : this.groqModel;
+
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
         {
-          model: this.groqModel,
+          model: modelToUse,
           messages,
           temperature: options.temperature || 0.7,
           top_p: options.top_p || 0.9,
@@ -121,11 +130,11 @@ class LLMService {
       return {
         success: true,
         text: text,
-        model: this.groqModel
+        model: modelToUse
       };
     } catch (error) {
       console.error('Groq generation error:', error.message);
-      console.error('Response:', error.response?.data);
+      if (error.response?.data) console.error('Response:', error.response.data);
 
       if (this.fallbackEnabled) {
         return this.fallbackResponse();
@@ -173,6 +182,49 @@ class LLMService {
     }
   }
 
+  generateFallbackSubtasks(task) {
+    const title = (task && task.title) ? task.title.trim() : 'Task';
+    const lower = title.toLowerCase();
+
+    if (lower.includes('study') || lower.includes('learn') || lower.includes('read') || lower.includes('course') || lower.includes('exam')) {
+      return [
+        { title: `Review materials and set up notes for ${title}`, description: 'Gather key resources and define learning goals', estimated_duration: 15 },
+        { title: `Dedicated focused session on core concepts`, description: 'Single-task without distractions for 25-30 minutes', estimated_duration: 30 },
+        { title: `Summarize key takeaways and test understanding`, description: 'Write down 3 main points learned', estimated_duration: 15 }
+      ];
+    } else if (lower.includes('write') || lower.includes('draft') || lower.includes('report') || lower.includes('essay') || lower.includes('email') || lower.includes('blog')) {
+      return [
+        { title: `Create outline and key points for ${title}`, description: 'Map out the structure and main ideas', estimated_duration: 15 },
+        { title: `Draft core content and sections`, description: 'Write out the full first version without editing yet', estimated_duration: 35 },
+        { title: `Review, edit, and polish final text`, description: 'Refine clarity, tone, and grammar', estimated_duration: 15 }
+      ];
+    } else if (lower.includes('clean') || lower.includes('organize') || lower.includes('tidy') || lower.includes('declutter')) {
+      return [
+        { title: `Sort and remove clutter for ${title}`, description: 'Clear away out-of-place items and prep the space', estimated_duration: 15 },
+        { title: `Deep clean and organize main space`, description: 'Wipe surfaces thoroughly and arrange essentials', estimated_duration: 25 },
+        { title: `Final touch-up and put away supplies`, description: 'Ensure the environment is completely reset and orderly', estimated_duration: 10 }
+      ];
+    } else if (lower.includes('exercise') || lower.includes('workout') || lower.includes('run') || lower.includes('gym') || lower.includes('walk') || lower.includes('cardio')) {
+      return [
+        { title: `Warm-up and dynamic stretches`, description: 'Prepare joints and elevate heart rate safely', estimated_duration: 10 },
+        { title: `Main workout session: ${title}`, description: 'Focus on form, steady pacing, and effort', estimated_duration: 30 },
+        { title: `Cool-down, hydration, and static stretches`, description: 'Aid recovery and lower heart rate safely', estimated_duration: 10 }
+      ];
+    } else if (lower.includes('code') || lower.includes('build') || lower.includes('fix') || lower.includes('debug') || lower.includes('develop') || lower.includes('app') || lower.includes('api')) {
+      return [
+        { title: `Analyze requirements and plan approach for ${title}`, description: 'Identify target files, logic, and potential edge cases', estimated_duration: 15 },
+        { title: `Implement core logic and changes`, description: 'Write the implementation with clean code practices', estimated_duration: 40 },
+        { title: `Test thoroughly, handle edge cases, and commit`, description: 'Verify behavior and make sure everything passes cleanly', estimated_duration: 20 }
+      ];
+    }
+
+    return [
+      { title: `Plan and gather materials for "${title}"`, description: 'Clarify objectives, steps, and required inputs', estimated_duration: 15 },
+      { title: `Execute the core work for "${title}"`, description: 'Focus on completing the main deliverable with zero distractions', estimated_duration: 30 },
+      { title: `Review, polish, and finalize "${title}"`, description: 'Check quality, polish details, and finalize', estimated_duration: 15 }
+    ];
+  }
+
   async generateTaskSuggestions(userGoals, context = {}) {
     const prompt = `Goals: ${userGoals.join('; ')}
 Context: ${JSON.stringify(context)}
@@ -182,13 +234,14 @@ Generate 3-5 actionable tasks. JSON array only:
 
     const response = await this.generateCompletion(prompt, { temperature: 0.8, max_tokens: 400 });
     
-    if (response.success) {
+    if (response.success && !response.fallback && response.text) {
       try {
-        const tasks = JSON.parse(response.text);
-        return { success: true, tasks };
+        const tasks = this.extractJSON(response.text);
+        if (Array.isArray(tasks) && tasks.length > 0) {
+          return { success: true, tasks };
+        }
       } catch (error) {
-        // If JSON parsing fails, try to extract tasks manually
-        return { success: false, error: 'Failed to parse task suggestions' };
+        console.warn('Failed to parse task suggestions from LLM:', error.message);
       }
     }
     
@@ -202,18 +255,31 @@ Context: ${JSON.stringify(userContext)}
 Break into 3-5 concrete subtasks. JSON array only:
 [{"title":"...","description":"one sentence","estimated_duration":30}]`;
 
-    const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 400 });
-    
-    if (response.success) {
-      try {
-        const subtasks = JSON.parse(response.text);
-        return { success: true, subtasks, reasoning: "Task broken down into manageable steps" };
-      } catch (error) {
-        return { success: false, error: 'Failed to parse subtask breakdown' };
+    try {
+      const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 400 });
+      
+      if (response.success && !response.fallback && response.text) {
+        try {
+          const subtasks = this.extractJSON(response.text);
+          if (Array.isArray(subtasks) && subtasks.length > 0) {
+            return { success: true, subtasks, reasoning: "Task broken down into manageable steps" };
+          }
+        } catch (error) {
+          console.warn('Failed to parse subtask breakdown JSON, falling back:', error.message);
+        }
       }
+    } catch (err) {
+      console.warn('LLM breakdown error, using smart fallback:', err.message);
     }
-    
-    return response;
+
+    // Always provide tailored fallback subtasks so the user is never blocked
+    const fallbackSubtasks = this.generateFallbackSubtasks(task);
+    return {
+      success: true,
+      subtasks: fallbackSubtasks,
+      reasoning: "Task broken down into structured steps",
+      fallback: true
+    };
   }
 
   async detectHabitPattern(actions, taskName) {
@@ -241,9 +307,9 @@ Return ONLY the JSON object.`;
 
     const response = await this.generateCompletion(prompt, { temperature: 0.6, max_tokens: 150 });
 
-    if (response.success) {
+    if (response.success && !response.fallback && response.text) {
       try {
-        const analysis = JSON.parse(response.text);
+        const analysis = this.extractJSON(response.text);
         return { success: true, analysis };
       } catch (error) {
         return { success: false, error: 'Failed to parse habit analysis' };
@@ -260,9 +326,9 @@ Be empathetic, focus on patterns not failures. JSON only:
 
     const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 200 });
     
-    if (response.success) {
+    if (response.success && !response.fallback && response.text) {
       try {
-        const insight = JSON.parse(response.text);
+        const insight = this.extractJSON(response.text);
         return { success: true, insight };
       } catch (error) {
         return { success: false, error: 'Failed to parse insight' };

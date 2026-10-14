@@ -399,6 +399,99 @@ async function parseAndExecuteCommand(message, userId, context) {
     }
   }
 
+  // Command 10: List / Show tasks
+  if (messageLower.match(/^(?:what (?:are my|tasks (?:do i have|are)|tasks for)|show (?:my )?tasks|list (?:my )?tasks|my tasks|tasks today|today'?s? tasks|what should i (?:work on|do)(?: today)?)$/i) ||
+      messageLower.includes('what tasks do i have') || messageLower === 'tasks' || messageLower === 'show tasks') {
+    try {
+      const result = await pool.query(
+        `SELECT id, title, description, estimated_duration, priority, energy_required
+         FROM tasks
+         WHERE user_id = $1 AND status = 'pending' AND deleted_at IS NULL AND archived_at IS NULL
+         ORDER BY priority_score DESC NULLS LAST, created_at ASC`,
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          executed: true,
+          response: `You don't have any pending tasks right now! 🎉\n\nYou're all caught up. Say "add task: [task name]" if you'd like to plan something, or "generate today's tasks" to create tasks from your recurring goals.`
+        };
+      }
+
+      let response = `📋 **Here are your active tasks for today (${result.rows.length}):**\n\n`;
+      result.rows.forEach((t, i) => {
+        const meta = [];
+        if (t.estimated_duration) meta.push(`${t.estimated_duration}m`);
+        if (t.priority && t.priority !== 'medium') meta.push(t.priority);
+        const metaStr = meta.length > 0 ? ` (${meta.join(', ')})` : '';
+        response += `${i + 1}. **${t.title}**${metaStr}\n`;
+        if (t.description) response += `   *${t.description}*\n`;
+      });
+      response += `\nWhich one would you like to focus on? You can say "mark done: [title]" when finished or "breakdown: [title]" for subtasks!`;
+
+      return { executed: true, response };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to retrieve tasks: ${error.message}`
+      };
+    }
+  }
+
+  // Command 11: Progress / Summary
+  if (messageLower.match(/^(?:how am i doing(?: today)?|my progress|progress|summary|today'?s? progress)$/i)) {
+    try {
+      const summaryResult = await pool.query(
+        `SELECT 
+           COUNT(*) FILTER (WHERE status = 'completed' AND (completed_at >= CURRENT_DATE OR updated_at >= CURRENT_DATE)) as completed_today,
+           COUNT(*) FILTER (WHERE status = 'pending' AND deleted_at IS NULL AND archived_at IS NULL) as pending_today
+         FROM tasks
+         WHERE user_id = $1`,
+        [userId]
+      );
+
+      const completed = parseInt(summaryResult.rows[0]?.completed_today || 0);
+      const pending = parseInt(summaryResult.rows[0]?.pending_today || 0);
+
+      let response = `📊 **Today's Overview:**\n\n`;
+      response += `• ✅ Completed today: **${completed}** task${completed !== 1 ? 's' : ''}\n`;
+      response += `• ⏳ In progress: **${pending}** task${pending !== 1 ? 's' : ''}\n\n`;
+
+      if (completed > 0 && pending === 0) {
+        response += `Incredible work! You've finished everything on your plate today. Time to relax! 🌟`;
+      } else if (completed > 0) {
+        response += `Great momentum! Keep chipping away at your list one step at a time. 💪`;
+      } else if (pending > 0) {
+        response += `Ready to start? Pick just one small task to build your initial momentum! 🚀`;
+      } else {
+        response += `A fresh, clear day! Say "add task: [name]" or "generate today's tasks" when you're ready. ✨`;
+      }
+
+      return { executed: true, response };
+    } catch (error) {
+      return {
+        executed: true,
+        response: `✗ Failed to retrieve progress: ${error.message}`
+      };
+    }
+  }
+
+  // Command 12: Help
+  if (messageLower === 'help' || messageLower === 'commands' || messageLower === 'what can you do') {
+    const helpMsg = `🤖 **Commands you can use anytime:**\n\n` +
+      `• **"what tasks do i have today?"** - View all pending tasks\n` +
+      `• **"add task: [title]"** - Quickly add a task\n` +
+      `• **"mark done: [title]"** - Complete a task\n` +
+      `• **"delete task: [title]"** - Remove a task\n` +
+      `• **"breakdown: [title]"** - Split task into smaller steps\n` +
+      `• **"my goals"** - List your recurring goals\n` +
+      `• **"add goal: [e.g. read 3x a week]"** - Create a recurring goal\n` +
+      `• **"generate today's tasks"** - Auto-create tasks from active goals\n` +
+      `• **"how am i doing today?"** - View today's completed vs pending count\n\n` +
+      `Or just chat with me normally about whatever's on your mind! 🌿`;
+    return { executed: true, response: helpMsg };
+  }
+
   // No command matched
   return { executed: false };
 }
@@ -524,7 +617,8 @@ router.delete('/history', isAuthenticated, async (req, res) => {
 
 async function generateAIResponse(userMessage, context, userId) {
   const groqApiKey = process.env.GROQ_API_KEY;
-  const groqModel = 'llama-3.1-8b-instant';
+  const configuredGroqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  const groqModel = configuredGroqModel === 'llama-3.1-70b-versatile' ? 'llama-3.3-70b-versatile' : configuredGroqModel;
 
   const pendingTasks = context.recentTasks.filter(t => t.status === 'pending');
   const completedTasks = context.recentTasks.filter(t => t.status === 'completed');
@@ -557,44 +651,100 @@ How to show up:
 - Never lecture, never unsolicited advice, never list things unless asked
 - Sound like a real person, not a bot`;
 
-  try {
-    // Include recent conversation history for continuity
-    const historyResult = await pool.query(
-      `SELECT role, content FROM chat_messages
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 8`,
-      [userId]
-    );
-    const recentHistory = historyResult.rows.reverse();
+  // Method 1: Try Direct Groq if API key is present
+  if (groqApiKey) {
+    try {
+      const historyResult = await pool.query(
+        `SELECT role, content FROM chat_messages
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 8`,
+        [userId]
+      );
+      const recentHistory = historyResult.rows.reverse();
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...recentHistory.map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: userMessage }
-    ];
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...recentHistory.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: userMessage }
+      ];
 
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      { model: groqModel, messages, temperature: 0.85, max_tokens: 300 },
-      {
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000
-      }
-    );
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        { model: groqModel, messages, temperature: 0.85, max_tokens: 300 },
+        {
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      );
 
-    return response.data.choices?.[0]?.message?.content?.trim()
-      || "I'm here with you! What's on your mind?";
-  } catch (error) {
-    console.error('Groq chat error:', error.message);
-    const pending = pendingTasks.length;
-    return pending > 0
-      ? `I'm right here! You've got ${pending} task${pending !== 1 ? 's' : ''} going — what do you want to focus on?`
-      : "I'm here with you! What are you working on today?";
+      const generated = response.data.choices?.[0]?.message?.content?.trim();
+      if (generated) return generated;
+    } catch (groqError) {
+      console.warn('Direct Groq chat attempt failed, trying llmService:', groqError.message);
+    }
   }
+
+  // Method 2: Try general llmService (Ollama / HuggingFace / Fallback)
+  try {
+    const llmService = require('../services/llmService');
+    const prompt = `${systemPrompt}\n\nUser: ${userMessage}\nCompanion:`;
+    const serviceRes = await llmService.generateCompletion(prompt, { temperature: 0.8, max_tokens: 250 });
+    if (serviceRes && serviceRes.success && !serviceRes.fallback && serviceRes.text) {
+      return serviceRes.text.trim();
+    }
+  } catch (serviceErr) {
+    console.warn('llmService chat attempt failed:', serviceErr.message);
+  }
+
+  // Method 3: Smart contextual fallback with randomized empathetic variety
+  const lowerMsg = userMessage.toLowerCase().trim();
+  const pending = pendingTasks.length;
+  const completed = completedTasks.length;
+
+  // Greetings
+  if (lowerMsg.match(/^(?:hi|hello|hey|good morning|good afternoon|good evening|yo|sup)\b/)) {
+    const greetingReplies = [
+      `Hey! Great to see you. How is your energy feeling today?`,
+      `Hi there! Hope your day is treating you well so far. What's on your mind?`,
+      `Hello! I'm right here with you. Taking things one step at a time today?`
+    ];
+    return greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
+  }
+
+  // User asking what to do / how to start
+  if (lowerMsg.includes('what should i') || lowerMsg.includes('where to start') || lowerMsg.includes('what next')) {
+    if (pending > 0) {
+      return `You've got ${pending} task${pending !== 1 ? 's' : ''} on your radar right now, starting with "${pendingTasks[0].title}". Want to tackle just 10 minutes of that to get some easy momentum?`;
+    }
+    return `Your task board is completely clear right now! You can add a new task anytime, or simply enjoy a quiet break.`;
+  }
+
+  // User venting or tired
+  if (lowerMsg.includes('tired') || lowerMsg.includes('exhausted') || lowerMsg.includes('overwhelm') || lowerMsg.includes('stressed') || lowerMsg.includes('hard')) {
+    return `I hear you. Take a deep breath — you don't have to carry the whole day at once. Even pausing for 5 minutes with a glass of water can help reset things. What's the heaviest thing on your plate?`;
+  }
+
+  // User sharing a win
+  if (lowerMsg.includes('done') || lowerMsg.includes('finished') || lowerMsg.includes('finally') || lowerMsg.includes('yay') || lowerMsg.includes('completed')) {
+    return `That's wonderful! Celebrate that win — every completed step builds real momentum. Take a moment to appreciate what you just finished. 🎉`;
+  }
+
+  // General companion fallbacks
+  const generalReplies = [
+    pending > 0
+      ? `I'm right here with you! You have ${pending} task${pending !== 1 ? 's' : ''} in progress. How are you feeling about tackling them?`
+      : `I'm right here! Your active task list is clear right now. What would you like to focus on?`,
+    completed > 0
+      ? `You've already knocked out ${completed} task${completed !== 1 ? 's' : ''} today. How are your energy levels holding up?`
+      : `I'm listening. Tell me what's on your mind or what you'd like to work towards today.`,
+    `Always here in your corner. Need a sounding board, a quick breakdown of a task, or just a minute to reset?`
+  ];
+
+  return generalReplies[Math.floor(Math.random() * generalReplies.length)];
 }
 
 module.exports = router;
