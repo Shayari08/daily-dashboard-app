@@ -11,12 +11,16 @@ import RecommendationsView from '../components/RecommendationsView';
 import Navbar from '../components/Navbar';
 import '../styles/Dashboard.css';
 
+// Demo mode is opt-in only (REACT_APP_DEMO_MODE=true). It must never be the fallback for real visitors.
+const DEMO_MODE = process.env.REACT_APP_DEMO_MODE === 'true';
+
 function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [activeView, setActiveView] = useState('tasks');
   const [newTask, setNewTask] = useState('');
   const [showChatbot, setShowChatbot] = useState(false);
@@ -42,10 +46,17 @@ function Dashboard() {
       setCompletedTasks(completedRes.data.tasks || []);
     } catch (error) {
       console.error('Failed to load data:', error);
-      // Demo mode — show dashboard without backend
-      setUser({ name: 'Demo User', email: 'demo@localhost' });
-      setTasks([]);
-      setCompletedTasks([]);
+      if (error.response?.status === 401) {
+        navigate('/login', { replace: true });
+        return;
+      }
+      if (DEMO_MODE) {
+        setUser({ name: 'Demo User', email: 'demo@localhost' });
+        setTasks([]);
+        setCompletedTasks([]);
+      } else {
+        setLoadError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -243,6 +254,15 @@ function Dashboard() {
       <div className="loading-screen">
         <div className="loading-spinner"></div>
         <p>Loading your dashboard...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="loading-screen">
+        <p>Couldn't load your dashboard. The server may be waking up.</p>
+        <button onClick={() => window.location.reload()}>Try again</button>
       </div>
     );
   }
