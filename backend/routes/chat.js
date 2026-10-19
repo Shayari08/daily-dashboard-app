@@ -776,7 +776,7 @@ How to show up:
           {
             systemInstruction: { parts: [{ text: systemPrompt }] },
             contents,
-            generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
+            generationConfig: { temperature: 0.85, maxOutputTokens: 600 }
           },
           { headers: { 'Content-Type': 'application/json' }, timeout: timeoutMs }
         );
@@ -818,12 +818,16 @@ How to show up:
         }
       }
 
-      const parts = response.data?.candidates?.[0]?.content?.parts || [];
+      const candidate = response.data?.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
       const generated = parts
         .map(p => p.text)
         .filter(Boolean)
         .join('')
         ?.trim();
+      if (candidate?.finishReason === 'MAX_TOKENS') {
+        console.warn(`⚠ Gemini chat response hit MAX_TOKENS (model '${targetModel}') — reply may be truncated. Raw text: "${generated}"`);
+      }
       if (generated) {
         console.log(`✓ Gemini generated companion response using '${targetModel}': ${generated.slice(0, 50)}...`);
         return generated;
@@ -857,7 +861,7 @@ How to show up:
 
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
-        { model: groqModel, messages, temperature: 0.85, max_tokens: 300 },
+        { model: groqModel, messages, temperature: 0.85, max_tokens: 600 },
         {
           headers: {
             'Authorization': `Bearer ${groqApiKey}`,
