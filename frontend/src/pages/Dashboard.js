@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import TaskCard from '../components/TaskCard';
@@ -31,11 +31,7 @@ function Dashboard() {
   const [breakdownTaskId, setBreakdownTaskId] = useState(null);
   const [subtaskInput, setSubtaskInput] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [userRes, tasksRes, completedRes] = await Promise.all([
         axios.get('/api/auth/me', { withCredentials: true }),
@@ -61,7 +57,11 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleAddTask = async (e) => {
     if (e && e.preventDefault) e.preventDefault();

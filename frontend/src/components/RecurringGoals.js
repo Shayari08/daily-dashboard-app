@@ -5,7 +5,6 @@ import '../styles/RecurringGoals.css';
 function RecurringGoals({ onTasksGenerated }) {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', frequency: 'x_per_week', timesPerWeek: 3 });
 
@@ -25,25 +24,6 @@ function RecurringGoals({ onTasksGenerated }) {
       console.error('Failed to load goals:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGenerateTasks = async () => {
-    setGenerating(true);
-    try {
-      const response = await axios.post('/api/recurring-goals/generate-daily-tasks', {}, {
-        withCredentials: true
-      });
-      if (response.data.success) {
-        alert(`Generated ${response.data.tasks.length} task(s) for today!`);
-        loadGoals();
-        if (onTasksGenerated) onTasksGenerated();
-      }
-    } catch (error) {
-      console.error('Failed to generate tasks:', error);
-      alert('Failed to generate tasks');
-    } finally {
-      setGenerating(false);
     }
   };
 

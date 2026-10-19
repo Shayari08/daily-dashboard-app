@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import '../styles/Insights.css';
 
@@ -7,13 +7,7 @@ function InsightsView({ userId }) {
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState(30);
 
-  useEffect(() => {
-    if (userId) {
-      loadInsights();
-    }
-  }, [userId, timeframe]);
-
-  const loadInsights = async () => {
+  const loadInsights = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`/api/insights/behavioral?days=${timeframe}`, {
@@ -28,7 +22,13 @@ function InsightsView({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeframe]);
+
+  useEffect(() => {
+    if (userId) {
+      loadInsights();
+    }
+  }, [userId, loadInsights]);
 
   if (loading) {
     return (

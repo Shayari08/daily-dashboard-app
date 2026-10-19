@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -13,16 +13,7 @@ function Archive() {
   const [calendar, setCalendar] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    loadCalendar();
-    loadArchiveForDate(selectedDate);
-  }, [selectedDate]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       const res = await axios.get('/api/auth/me', { withCredentials: true });
       setUser(res.data.user);
@@ -31,7 +22,16 @@ function Archive() {
         navigate('/login');
       }
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  useEffect(() => {
+    loadCalendar();
+    loadArchiveForDate(selectedDate);
+  }, [selectedDate]);
 
   const loadCalendar = async () => {
     try {
