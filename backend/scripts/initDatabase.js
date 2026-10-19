@@ -2,9 +2,10 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 // When run directly, create a standalone pool; when imported, caller passes one in
+const isLocalDb = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL || '');
 const standalonePool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL && !isLocalDb ? { rejectUnauthorized: false } : false
 });
 
 const initDatabase = async (pool = standalonePool) => {
@@ -349,6 +350,7 @@ const initDatabase = async (pool = standalonePool) => {
       CREATE INDEX IF NOT EXISTS idx_daily_states_user_date ON daily_states(user_id, state_date);
       CREATE INDEX IF NOT EXISTS idx_recurring_goals_user_id ON recurring_goals(user_id);
       CREATE INDEX IF NOT EXISTS idx_recurring_goals_active ON recurring_goals(user_id, is_active);
+      CREATE INDEX IF NOT EXISTS idx_goal_completion_logs_goal ON goal_completion_logs(goal_id, date);
       CREATE INDEX IF NOT EXISTS idx_archives_user_date ON daily_archives(user_id, archive_date);
       CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_user_goals_user_id ON user_goals(user_id);
@@ -388,6 +390,24 @@ const initDatabase = async (pool = standalonePool) => {
       $$ LANGUAGE plpgsql;
     `);
     console.log('✓ Functions created');
+
+    // Local single-user bypass: ensure a fixed local user + profile exist
+    if (process.env.LOCAL_AUTH_BYPASS === 'true') {
+      const userResult = await client.query(
+        `INSERT INTO users (oauth_provider, oauth_id, email, name)
+         VALUES ('local', 'local-user', 'local@dashboard.local', 'Shayari')
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id`
+      );
+      const localUserId = userResult.rows[0]
+        ? userResult.rows[0].id
+        : (await client.query('SELECT id FROM users WHERE email = $1', ['local@dashboard.local'])).rows[0].id;
+      await client.query(
+        'INSERT INTO user_profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
+        [localUserId]
+      );
+      console.log('✓ Local user ensured');
+    }
 
     console.log('✅ Database initialization completed successfully!');
   } catch (error) {

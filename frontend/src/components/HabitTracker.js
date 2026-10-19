@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { describeError } from '../utils/errors';
 import '../styles/HabitTracker.css';
 
 function HabitTracker({ onUpdate }) {
@@ -49,7 +50,7 @@ function HabitTracker({ onUpdate }) {
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Failed to create habit:', error);
-      alert(error.response?.data?.error || 'Failed to create habit. Please try again.');
+      alert(`Couldn't add habit: ${describeError(error)}`);
     }
   };
 

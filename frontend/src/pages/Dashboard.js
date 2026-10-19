@@ -9,6 +9,7 @@ import InsightsView from '../components/InsightsView';
 import RecurringGoals from '../components/RecurringGoals';
 import RecommendationsView from '../components/RecommendationsView';
 import Navbar from '../components/Navbar';
+import { describeError } from '../utils/errors';
 import '../styles/Dashboard.css';
 
 // Demo mode is opt-in only (REACT_APP_DEMO_MODE=true). It must never be the fallback for real visitors.
@@ -77,7 +78,7 @@ function Dashboard() {
       loadData();
     } catch (error) {
       console.error('Failed to create task:', error);
-      alert(error.response?.data?.error || 'Failed to create task. Please try again.');
+      alert(`Couldn't add task: ${describeError(error)}`);
     }
   };
 
@@ -176,7 +177,7 @@ function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to AI breakdown task:', error);
-      alert('Failed to generate subtasks. Make sure you have onboarding data or try manual breakdown.');
+      alert(`Failed to generate subtasks: ${describeError(error)}`);
     }
   };
 
@@ -243,7 +244,7 @@ function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to generate tasks:', error);
-      alert('Failed to generate tasks. Make sure you have completed onboarding.');
+      alert(`Failed to generate tasks: ${describeError(error)}`);
     } finally {
       setGeneratingTasks(false);
     }

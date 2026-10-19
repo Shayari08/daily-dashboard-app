@@ -110,7 +110,7 @@ function Chatbot({ onClose }) {
         message: userMessage
       }, { 
         withCredentials: true,
-        timeout: 30000
+        timeout: 180000 // local AI (Ollama) can take a while on first load
       });
 
       console.log('📥 Backend response:', response.data);
@@ -134,7 +134,9 @@ function Chatbot({ onClose }) {
       // Show error message instead of fallback
       setMessages([...newMessages, {
         role: 'assistant',
-        content: "I'm having trouble connecting right now. The backend received your message but there was an error processing the response. Please check the backend terminal for details."
+        content: error.response
+          ? `Something went wrong: ${error.response.data?.details || error.response.data?.error || error.message}`
+          : "I can't reach the backend right now. Make sure the backend server is running (start-dashboard.bat)."
       }]);
     } finally {
       setLoading(false);

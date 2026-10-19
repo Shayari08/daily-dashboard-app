@@ -17,6 +17,9 @@ dist/
 npm-debug.log*
 backend/logs/
 
+# Local embedded PostgreSQL data
+backend/.pgdata/
+
 # Claude Code local settings
 .claude/
 

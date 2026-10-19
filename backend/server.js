@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const logger = require('./config/logger');
 const { metricsMiddleware, metricsHandler } = require('./middleware/metrics');
 const pool = require('./config/db');
+const startLocalDatabase = require('./config/localDb');
 
 const PgSession = connectPgSimple(session);
 
@@ -60,7 +61,10 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
-app.use('/api/', limiter);
+// Local single-user mode: the dashboard easily exceeds 100 requests/15min on its own
+if (process.env.LOCAL_AUTH_BYPASS !== 'true') {
+  app.use('/api/', limiter);
+}
 
 // Body parsing middleware
 app.use(express.json());
@@ -97,6 +101,22 @@ app.use(session({
 // Passport initialization
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Local single-user bypass: skips OAuth entirely for local/offline use.
+// Leaves passport/OAuth routes untouched for the hosted (Render) deployment.
+const LOCAL_USER_EMAIL = 'local@dashboard.local';
+if (process.env.LOCAL_AUTH_BYPASS === 'true') {
+  app.use(async (req, res, next) => {
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [LOCAL_USER_EMAIL]);
+      req.user = result.rows[0];
+      req.isAuthenticated = () => true;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -147,7 +167,12 @@ app.use((req, res) => {
 });
 
 let server;
-initDatabase(pool)
+let localDb;
+startLocalDatabase()
+  .then((db) => {
+    localDb = db;
+    return initDatabase(pool);
+  })
   .then(() => {
     server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
@@ -161,12 +186,17 @@ initDatabase(pool)
   });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  server.close(async () => {
-    logger.info('HTTP server closed');
+const shutdown = (signal) => {
+  logger.info(`${signal} signal received: closing HTTP server`);
+  const closeDb = async () => {
     await pool.end();
     logger.info('Database pool closed');
-  });
-});
+    if (localDb) await localDb.stop();
+    process.exit(0);
+  };
+  if (server) server.close(closeDb);
+  else closeDb();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 

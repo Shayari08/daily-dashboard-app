@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 const { isAuthenticated } = require('./auth');
+const llmService = require('../services/llmService');
 
 const pool = require('../config/db');
 
@@ -143,8 +143,7 @@ async function parseAndExecuteCommand(message, userId, context) {
 
       const task = taskResult.rows[0];
 
-      // Generate subtasks using LLM (would need to require llmService)
-      const llmService = require('../services/llmService');
+      // Generate subtasks using LLM
       const breakdownResult = await llmService.breakdownTask(task, context);
 
       if (!breakdownResult.success) {

@@ -314,34 +314,50 @@ class LLMService {
   }
 
   async generateOllamaCompletion(prompt, options = {}) {
+    const messages = [];
+    if (options.system) {
+      messages.push({ role: 'system', content: options.system });
+    }
+    messages.push({ role: 'user', content: prompt });
+    return this.generateOllamaChat(messages, options);
+  }
+
+  async generateOllamaChat(messages, options = {}) {
     try {
-      const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
+      const response = await axios.post(`${this.ollamaUrl}/api/chat`, {
         model: this.model,
-        prompt,
+        messages,
         stream: false,
+        // Structured output: constrains small local models to valid JSON
+        ...(options.json === 'array' && {
+          format: {
+            type: 'object',
+            properties: { items: { type: 'array', items: { type: 'object' } } },
+            required: ['items']
+          }
+        }),
+        ...(options.json === 'object' && { format: 'json' }),
         options: {
           temperature: options.temperature || 0.7,
           top_p: options.top_p || 0.9,
+          ...(options.max_tokens && { num_predict: options.max_tokens })
         }
       }, {
-        timeout: 60000 // 60 second timeout for complex prompts
+        timeout: 180000 // local models on CPU can be slow, especially on first load
       });
 
       return {
         success: true,
-        text: response.data.response,
+        text: response.data.message?.content || '',
         model: this.model
       };
     } catch (error) {
-      console.error('LLM generation error:', error.message);
-
-      if (this.fallbackEnabled) {
-        return this.fallbackResponse(prompt, options);
-      }
+      const detail = error.response?.data?.error || error.message;
+      console.error(`Ollama error (model "${this.model}" at ${this.ollamaUrl}):`, detail);
 
       return {
         success: false,
-        error: error.message,
+        error: `Local AI unavailable: ${detail}. Make sure Ollama is running and "${this.model}" is installed (ollama pull ${this.model}).`,
         fallback: false
       };
     }
@@ -390,6 +406,23 @@ class LLMService {
     ];
   }
 
+  // Parse a JSON payload out of an LLM response; arrays may come back wrapped in an object
+  parseJSONResponse(response, { expectArray = false } = {}) {
+    if (!response.success) return { ok: false, error: response.error };
+    if (response.fallback) return { ok: false, error: 'AI is currently unavailable' };
+
+    try {
+      let data = this.extractJSON(response.text);
+      if (expectArray && !Array.isArray(data) && data && typeof data === 'object') {
+        data = Object.values(data).find(Array.isArray) || [data];
+      }
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Failed to parse AI JSON:', response.text);
+      return { ok: false, error: 'AI returned an invalid response. Please try again.' };
+    }
+  }
+
   async generateTaskSuggestions(userGoals, context = {}) {
     const prompt = `Goals: ${userGoals.join('; ')}
 Context: ${JSON.stringify(context)}
@@ -398,7 +431,7 @@ Generate 3-5 actionable tasks. JSON array only:
 [{"title":"...","description":"one sentence","energy_required":3,"reasoning":"one sentence"}]`;
 
     const response = await this.generateCompletion(prompt, { temperature: 0.8, max_tokens: 400 });
-    
+
     if (response.success && !response.fallback && response.text) {
       try {
         const tasks = this.extractJSON(response.text);
@@ -409,7 +442,7 @@ Generate 3-5 actionable tasks. JSON array only:
         console.warn('Failed to parse task suggestions from LLM:', error.message);
       }
     }
-    
+
     return response;
   }
 
@@ -422,7 +455,7 @@ Break into 3-5 concrete subtasks. JSON array only:
 
     try {
       const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 400 });
-      
+
       if (response.success && !response.fallback && response.text) {
         try {
           const subtasks = this.extractJSON(response.text);
@@ -480,7 +513,7 @@ Return ONLY the JSON object.`;
         return { success: false, error: 'Failed to parse habit analysis' };
       }
     }
-    
+
     return response;
   }
 
@@ -490,7 +523,7 @@ Be empathetic, focus on patterns not failures. JSON only:
 {"title":"concise title","content":"2-3 sentences","confidence":"low|medium|high","suggestion":"optional one sentence"}`;
 
     const response = await this.generateCompletion(prompt, { temperature: 0.7, max_tokens: 200 });
-    
+
     if (response.success && !response.fallback && response.text) {
       try {
         const insight = this.extractJSON(response.text);
@@ -499,7 +532,7 @@ Be empathetic, focus on patterns not failures. JSON only:
         return { success: false, error: 'Failed to parse insight' };
       }
     }
-    
+
     return response;
   }
 
@@ -519,20 +552,36 @@ Answer concisely:`;
       return JSON.parse(text);
     } catch (e) {
       // Try to find JSON in markdown code blocks
-      const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```/);
+      const jsonMatch = text.match(/```(?:json)?\s*([\[{][\s\S]*[\]}])\s*```/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[1]);
       }
 
-      // Try to find JSON object or array without markdown
+      // Try to find JSON object or array without markdown — whichever starts first
       const objectMatch = text.match(/(\{[\s\S]*\})/);
       const arrayMatch = text.match(/(\[[\s\S]*\])/);
+      const candidates = [arrayMatch, objectMatch]
+        .filter(Boolean)
+        .sort((a, b) => a.index - b.index);
 
-      if (objectMatch) {
-        return JSON.parse(objectMatch[1]);
+      for (const match of candidates) {
+        try {
+          return JSON.parse(match[1]);
+        } catch (err) {
+          // try the next candidate
+        }
       }
-      if (arrayMatch) {
-        return JSON.parse(arrayMatch[1]);
+
+      // Small local models sometimes stop before closing an array: keep the
+      // complete objects and close it ourselves
+      const arrayStart = text.indexOf('[');
+      const lastObjectEnd = text.lastIndexOf('}');
+      if (arrayStart !== -1 && lastObjectEnd > arrayStart) {
+        try {
+          return JSON.parse(text.slice(arrayStart, lastObjectEnd + 1) + ']');
+        } catch (err) {
+          // fall through
+        }
       }
 
       throw new Error('No valid JSON found in response');
@@ -544,19 +593,9 @@ Answer concisely:`;
     const prompt = `Goals: "${goalsText}"
 Return: {"themes":["kw1","kw2"],"insight":"1-2 encouraging sentences.","tone":"positive|ambitious|cautious"}`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.6, max_tokens: 120, system });
-
-    if (response.success) {
-      try {
-        const analysis = this.extractJSON(response.text);
-        return { success: true, analysis };
-      } catch (error) {
-        console.error('Failed to parse goals analysis:', response.text);
-        return { success: false, error: 'Failed to parse goals analysis' };
-      }
-    }
-
-    return response;
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.6, max_tokens: 120, system, json: 'object' });
+    const parsed = this.parseJSONResponse(response);
+    return parsed.ok ? { success: true, analysis: parsed.data } : { success: false, error: parsed.error };
   }
 
   async generateOnboardingTasks(onboardingData) {
@@ -573,19 +612,9 @@ Generate 5-7 tasks. Constraints: completable today in 15-60 min; first 1-2 tasks
 JSON array only:
 [{"title":"...","description":"one sentence","category":"...","priority":"high|medium|low","estimatedDuration":30,"reasoning":"one sentence"}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system });
-
-    if (response.success) {
-      try {
-        const tasks = this.extractJSON(response.text);
-        return { success: true, tasks };
-      } catch (error) {
-        console.error('Failed to parse task generation:', response.text);
-        return { success: false, error: 'Failed to parse task generation' };
-      }
-    }
-
-    return response;
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system, json: 'array' });
+    const parsed = this.parseJSONResponse(response, { expectArray: true });
+    return parsed.ok ? { success: true, tasks: parsed.data } : { success: false, error: parsed.error };
   }
 
   async generateDailyTasks(context) {
@@ -657,19 +686,9 @@ Generate 5-7 tasks for TODAY: specific and completable in 15-45 min, no repeats.
 JSON array only:
 [{"title":"...","description":"one sentence","category":"...","estimatedDuration":30}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system });
-
-    if (response.success) {
-      try {
-        const tasks = this.extractJSON(response.text);
-        return { success: true, tasks };
-      } catch (error) {
-        console.error('Failed to parse daily task generation:', response.text);
-        return { success: false, error: 'Failed to parse daily task generation' };
-      }
-    }
-
-    return response;
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 650, system, json: 'array' });
+    const parsed = this.parseJSONResponse(response, { expectArray: true });
+    return parsed.ok ? { success: true, tasks: parsed.data } : { success: false, error: parsed.error };
   }
 
   async generateRecommendations(context) {
@@ -720,19 +739,9 @@ Generate exactly 5 recommendations.
 JSON array only:
 [{"title":"...","description":"2 sentences","resource_type":"video|article|paper|book|podcast|course","search_query":"...","author_or_source":"...","relevance_reason":"one sentence naming their specific goal"}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 900, system });
-
-    if (response.success) {
-      try {
-        const recommendations = this.extractJSON(response.text);
-        return { success: true, recommendations };
-      } catch (error) {
-        console.error('Failed to parse recommendations:', response.text);
-        return { success: false, error: 'Failed to parse recommendations' };
-      }
-    }
-
-    return response;
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 900, system, json: 'array' });
+    const parsed = this.parseJSONResponse(response, { expectArray: true });
+    return parsed.ok ? { success: true, recommendations: parsed.data } : { success: false, error: parsed.error };
   }
 
   async generateOnboardingHabits(onboardingData) {
@@ -748,19 +757,9 @@ Generate 3-5 habits. Include the anchor point in each description.
 JSON array only:
 [{"name":"emoji Name","frequency":"daily|weekly","description":"what to do + anchor point, 1-2 sentences","category":"...","reasoning":"one sentence on compounding effect"}]`;
 
-    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 550, system });
-
-    if (response.success) {
-      try {
-        const habits = this.extractJSON(response.text);
-        return { success: true, habits };
-      } catch (error) {
-        console.error('Failed to parse habit generation:', response.text);
-        return { success: false, error: 'Failed to parse habit generation' };
-      }
-    }
-
-    return response;
+    const response = await this.generateOnboardingCompletion(prompt, { temperature: 0.8, max_tokens: 550, system, json: 'array' });
+    const parsed = this.parseJSONResponse(response, { expectArray: true });
+    return parsed.ok ? { success: true, habits: parsed.data } : { success: false, error: parsed.error };
   }
 
   fallbackResponse() {
