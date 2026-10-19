@@ -627,12 +627,61 @@ router.delete('/history', isAuthenticated, async (req, res) => {
 // AI Response Generator — Gemini-powered companion
 // ================================================
 
-async function generateAIResponse(userMessage, context, userId) {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const configuredGeminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-  const geminiModel = configuredGeminiModel.replace(/^models\//, '');
+let cachedWorkingGeminiModel = null;
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+async function resolveWorkingGeminiModel(apiKey, preferredModel) {
+  if (cachedWorkingGeminiModel) return cachedWorkingGeminiModel;
+
+  const cleanPref = (preferredModel || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+
+  try {
+    const listRes = await axios.get(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      { timeout: 10000 }
+    );
+    const models = listRes.data?.models || [];
+    const supported = models.filter(m =>
+      Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
+    );
+
+    // 1. Is preferredModel in the supported list?
+    const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
+    if (exact) {
+      cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
+      return cachedWorkingGeminiModel;
+    }
+
+    // 2. Try known popular candidates in priority order
+    const priorityCandidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-pro'];
+    for (const cand of priorityCandidates) {
+      const match = supported.find(m => m.name.includes(cand));
+      if (match) {
+        cachedWorkingGeminiModel = match.name.replace(/^models\//, '');
+        console.log(`✓ Auto-resolved working Gemini model: ${cachedWorkingGeminiModel}`);
+        return cachedWorkingGeminiModel;
+      }
+    }
+
+    // 3. Fallback to first available generateContent model
+    if (supported.length > 0) {
+      cachedWorkingGeminiModel = supported[0].name.replace(/^models\//, '');
+      console.log(`✓ Using first available Gemini model: ${cachedWorkingGeminiModel}`);
+      return cachedWorkingGeminiModel;
+    }
+  } catch (err) {
+    console.warn('Could not query Gemini ListModels:', err.message);
+  }
+
+  cachedWorkingGeminiModel = cleanPref;
+  return cleanPref;
+}
+
+async function generateAIResponse(userMessage, context, userId) {
+  const rawGeminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = rawGeminiApiKey ? rawGeminiApiKey.trim().replace(/^["']|["']$/g, '') : null;
+  const configuredGeminiModel = (process.env.GEMINI_MODEL || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+
+  const groqApiKey = process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.trim().replace(/^["']|["']$/g, '') : null;
   const configuredGroqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   const groqModel = configuredGroqModel === 'llama-3.1-70b-versatile' ? 'llama-3.3-70b-versatile' : configuredGroqModel;
 
@@ -707,25 +756,40 @@ How to show up:
         parts: [{ text: userMessage }]
       });
 
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-        {
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
+      // Try initial model, then auto-resolve on 404
+      let targetModel = cachedWorkingGeminiModel || configuredGeminiModel;
+      let response;
+
+      try {
+        response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
+          {
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
           },
-          contents,
-          generationConfig: {
-            temperature: 0.85,
-            maxOutputTokens: 300
-          }
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000
+          { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+        );
+      } catch (firstErr) {
+        if (firstErr.response?.status === 404) {
+          console.warn(`Gemini model '${targetModel}' returned 404. Resolving working model...`);
+          cachedWorkingGeminiModel = null;
+          targetModel = await resolveWorkingGeminiModel(geminiApiKey, configuredGeminiModel);
+          console.log(`Retrying Gemini generateContent with resolved model: '${targetModel}'`);
+
+          response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
+            {
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents,
+              generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
+            },
+            { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+          );
+        } else {
+          throw firstErr;
         }
-      );
+      }
 
       const generated = response.data?.candidates?.[0]?.content?.parts
         ?.map(p => p.text)

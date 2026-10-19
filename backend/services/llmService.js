@@ -50,6 +50,49 @@ class LLMService {
     }
   }
 
+  async resolveWorkingGeminiModel(preferredModel) {
+    if (this.cachedWorkingGeminiModel) return this.cachedWorkingGeminiModel;
+
+    const cleanPref = (preferredModel || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+
+    try {
+      const listRes = await axios.get(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${this.geminiApiKey}`,
+        { timeout: 10000 }
+      );
+      const models = listRes.data?.models || [];
+      const supported = models.filter(m =>
+        Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
+      );
+
+      const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
+      if (exact) {
+        this.cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
+        return this.cachedWorkingGeminiModel;
+      }
+
+      const priorityCandidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-pro'];
+      for (const cand of priorityCandidates) {
+        const match = supported.find(m => m.name.includes(cand));
+        if (match) {
+          this.cachedWorkingGeminiModel = match.name.replace(/^models\//, '');
+          console.log(`✓ Auto-resolved working Gemini model in llmService: ${this.cachedWorkingGeminiModel}`);
+          return this.cachedWorkingGeminiModel;
+        }
+      }
+
+      if (supported.length > 0) {
+        this.cachedWorkingGeminiModel = supported[0].name.replace(/^models\//, '');
+        return this.cachedWorkingGeminiModel;
+      }
+    } catch (err) {
+      console.warn('Could not query Gemini ListModels in llmService:', err.message);
+    }
+
+    this.cachedWorkingGeminiModel = cleanPref;
+    return cleanPref;
+  }
+
   async generateGeminiCompletion(prompt, options = {}) {
     if (!this.geminiApiKey) {
       console.warn('Gemini API key not provided, using fallback');
@@ -57,8 +100,7 @@ class LLMService {
     }
 
     try {
-      const cleanModel = (this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
+      let cleanModel = this.cachedWorkingGeminiModel || (this.geminiModel || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
 
       const requestBody = {
         contents: [
@@ -79,12 +121,26 @@ class LLMService {
         };
       }
 
-      const response = await axios.post(url, requestBody, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000
-      });
+      let response;
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
+        response = await axios.post(url, requestBody, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 30000
+        });
+      } catch (firstErr) {
+        if (firstErr.response?.status === 404) {
+          console.warn(`Gemini model '${cleanModel}' returned 404 in llmService. Resolving working model...`);
+          cleanModel = await this.resolveWorkingGeminiModel(this.geminiModel);
+          const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
+          response = await axios.post(retryUrl, requestBody, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000
+          });
+        } else {
+          throw firstErr;
+        }
+      }
 
       const text = response.data?.candidates?.[0]?.content?.parts
         ?.map(p => p.text)
