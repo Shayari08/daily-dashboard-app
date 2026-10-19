@@ -92,9 +92,26 @@ router.post('/skip', isAuthenticated, async (req, res) => {
 // ============================================
 router.post('/complete', isAuthenticated, async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
+
+    // Idempotency guard: onboarding generates tasks/habits as a side effect,
+    // and nothing clears old ones on a repeat call — without this, a retried
+    // request (flaky network, a stale redirect bouncing the user back here,
+    // a double form submit) silently stacks another full batch on top of
+    // whatever's already there every single time it's hit.
+    const alreadyDone = await client.query(
+      'SELECT onboarding_completed FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (alreadyDone.rows[0]?.onboarding_completed) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'Onboarding already completed',
+        alreadyCompleted: true
+      });
+    }
 
     const {
       name,

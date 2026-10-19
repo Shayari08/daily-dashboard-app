@@ -170,6 +170,12 @@ function Onboarding() {
         navigate('/dashboard');
       }
     } catch (error) {
+      if (error.response?.data?.alreadyCompleted) {
+        // Already done from an earlier submission (e.g. a retried request) —
+        // nothing went wrong, just continue on.
+        navigate('/dashboard');
+        return;
+      }
       console.error('Error completing onboarding:', error);
       setError('Failed to save your preferences. Please try again.');
     } finally {
