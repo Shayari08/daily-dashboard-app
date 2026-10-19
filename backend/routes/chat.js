@@ -652,7 +652,7 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint =
     );
 
     // 1. Priority candidates - put gemini-3.8-flash first as advised by Google
-    const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+    const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
     for (const cand of priorityCandidates) {
       const match = supported.find(m => m.name === `models/${cand}` || m.name === cand || m.name.endsWith(`/${cand}`));
       if (match) {
@@ -768,9 +768,9 @@ How to show up:
       let targetModel = cachedWorkingGeminiModel || configuredGeminiModel;
       let response;
 
-      try {
-        response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
+      const postGemini = async (modelName) => {
+        return axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`,
           {
             systemInstruction: { parts: [{ text: systemPrompt }] },
             contents,
@@ -778,6 +778,10 @@ How to show up:
           },
           { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
         );
+      };
+
+      try {
+        response = await postGemini(targetModel);
       } catch (firstErr) {
         if (firstErr.response?.status === 404) {
           const errMsg = firstErr.response?.data?.error?.message || '';
@@ -790,15 +794,7 @@ How to show up:
           console.log(`Retrying Gemini generateContent with resolved model: '${targetModel}'`);
 
           try {
-            response = await axios.post(
-              `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
-              {
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                contents,
-                generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
-              },
-              { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
-            );
+            response = await postGemini(targetModel);
           } catch (retryErr) {
             const retryErrMsg = retryErr.response?.data?.error?.message || '';
             const retrySuggested = retryErrMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
@@ -806,15 +802,7 @@ How to show up:
               targetModel = retrySuggested[1];
               cachedWorkingGeminiModel = targetModel;
               console.log(`Retrying Gemini generateContent with recommended model from error: '${targetModel}'`);
-              response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
-                {
-                  systemInstruction: { parts: [{ text: systemPrompt }] },
-                  contents,
-                  generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
-                },
-                { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
-              );
+              response = await postGemini(targetModel);
             } else {
               throw retryErr;
             }
@@ -824,11 +812,16 @@ How to show up:
         }
       }
 
-      const generated = response.data?.candidates?.[0]?.content?.parts
-        ?.map(p => p.text)
+      const parts = response.data?.candidates?.[0]?.content?.parts || [];
+      const generated = parts
+        .map(p => p.text)
+        .filter(Boolean)
         .join('')
         ?.trim();
-      if (generated) return generated;
+      if (generated) {
+        console.log(`✓ Gemini generated companion response using '${targetModel}': ${generated.slice(0, 50)}...`);
+        return generated;
+      }
     } catch (geminiError) {
       console.warn('Direct Gemini chat attempt failed, trying fallback:', geminiError.message);
       if (geminiError.response?.data) {
@@ -837,8 +830,8 @@ How to show up:
     }
   }
 
-  // Method 1b: Try Direct Groq if Gemini is not set and Groq API key is present
-  if (groqApiKey && !geminiApiKey) {
+  // Method 1b: Try Direct Groq if Gemini failed or is not set
+  if (groqApiKey) {
     try {
       const historyResult = await pool.query(
         `SELECT role, content FROM chat_messages
@@ -895,7 +888,7 @@ How to show up:
   // Greetings
   if (lowerMsg.match(/^(?:hi|hello|hey|good morning|good afternoon|good evening|yo|sup)\b/)) {
     const greetingReplies = [
-      `Hey! Great to see you. How is your energy feeling today?`,
+      `Hey, good to see you! How is your energy feeling today?`,
       `Hi there! Hope your day is treating you well so far. What's on your mind?`,
       `Hello! I'm right here with you. Taking things one step at a time today?`
     ];

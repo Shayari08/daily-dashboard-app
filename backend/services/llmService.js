@@ -73,7 +73,7 @@ class LLMService {
       );
 
       // 1. Try modern priority candidates (gemini-3.8-flash first)
-      const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+      const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
       for (const cand of priorityCandidates) {
         const match = supported.find(m => m.name === `models/${cand}` || m.name === cand || m.name.endsWith(`/${cand}`));
         if (match) {
