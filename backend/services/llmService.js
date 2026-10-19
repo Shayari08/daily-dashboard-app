@@ -3,9 +3,9 @@ const axios = require('axios');
 class LLMService {
   constructor() {
     this.geminiApiKey = process.env.GEMINI_API_KEY;
-    const rawGeminiModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const rawGeminiModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
     const cleanGemini = rawGeminiModel.trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
-    this.geminiModel = (cleanGemini === 'gemini-2.5-flash' || cleanGemini === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : cleanGemini;
+    this.geminiModel = (cleanGemini === 'gemini-2.5-flash' || cleanGemini === 'gemini-1.5-flash') ? 'gemini-3.5-flash' : cleanGemini;
 
     this.provider = process.env.LLM_PROVIDER || (this.geminiApiKey ? 'gemini' : (process.env.GROQ_API_KEY ? 'groq' : 'ollama')); // 'gemini' or 'groq' or 'huggingface' or 'ollama'
     this.ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
@@ -59,8 +59,8 @@ class LLMService {
 
     if (this.cachedWorkingGeminiModel) return this.cachedWorkingGeminiModel;
 
-    const rawPref = (preferredModel || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
-    const cleanPref = (rawPref === 'gemini-2.5-flash' || rawPref === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawPref;
+    const rawPref = (preferredModel || 'gemini-3.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+    const cleanPref = (rawPref === 'gemini-2.5-flash' || rawPref === 'gemini-1.5-flash') ? 'gemini-3.5-flash' : rawPref;
 
     try {
       const listRes = await axios.get(
@@ -72,8 +72,15 @@ class LLMService {
         Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
       );
 
-      // 1. Try modern priority candidates (gemini-3.8-flash first)
-      const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+      // 1. Exact match on requested model
+      const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref || m.name.endsWith(`/${cleanPref}`));
+      if (exact) {
+        this.cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
+        return this.cachedWorkingGeminiModel;
+      }
+
+      // 2. Try priority candidates
+      const priorityCandidates = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
       for (const cand of priorityCandidates) {
         const match = supported.find(m => m.name === `models/${cand}` || m.name === cand || m.name.endsWith(`/${cand}`));
         if (match) {
@@ -81,13 +88,6 @@ class LLMService {
           console.log(`✓ Auto-resolved working Gemini model in llmService: ${this.cachedWorkingGeminiModel}`);
           return this.cachedWorkingGeminiModel;
         }
-      }
-
-      // 2. Exact match on clean preferred model
-      const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
-      if (exact) {
-        this.cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
-        return this.cachedWorkingGeminiModel;
       }
 
       if (supported.length > 0) {
@@ -109,9 +109,9 @@ class LLMService {
     }
 
     try {
-      let cleanModel = this.cachedWorkingGeminiModel || (this.geminiModel || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+      let cleanModel = this.cachedWorkingGeminiModel || (this.geminiModel || 'gemini-3.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
       if (cleanModel === 'gemini-2.5-flash' || cleanModel === 'gemini-1.5-flash') {
-        cleanModel = 'gemini-3.8-flash';
+        cleanModel = 'gemini-3.5-flash';
       }
 
       const requestBody = {
@@ -138,23 +138,27 @@ class LLMService {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
         response = await axios.post(url, requestBody, {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 30000
+          timeout: 12000
         });
       } catch (firstErr) {
-        if (firstErr.response?.status === 404) {
-          const errMsg = firstErr.response?.data?.error?.message || '';
+        const isTimeout = firstErr.code === 'ECONNABORTED' || firstErr.message?.includes('timeout');
+        const isCapacity = firstErr.response?.status === 503;
+        const isNotFound = firstErr.response?.status === 404;
+
+        if (isNotFound || isCapacity || isTimeout) {
+          const errMsg = firstErr.response?.data?.error?.message || firstErr.message || '';
           const suggestedMatch = errMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
           const suggestedHint = suggestedMatch ? suggestedMatch[1] : null;
 
-          console.warn(`Gemini model '${cleanModel}' returned 404 (${errMsg}). Resolving working model...`);
+          console.warn(`Gemini model '${cleanModel}' failed in llmService (${isTimeout ? 'timeout' : firstErr.response?.status}). Resolving working model...`);
           this.cachedWorkingGeminiModel = null;
-          cleanModel = await this.resolveWorkingGeminiModel(this.geminiModel, suggestedHint);
+          cleanModel = await this.resolveWorkingGeminiModel('gemini-2.0-flash', suggestedHint);
 
           try {
             const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
             response = await axios.post(retryUrl, requestBody, {
               headers: { 'Content-Type': 'application/json' },
-              timeout: 30000
+              timeout: 12000
             });
           } catch (retryErr) {
             const retryErrMsg = retryErr.response?.data?.error?.message || '';
@@ -166,7 +170,7 @@ class LLMService {
               const finalUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
               response = await axios.post(finalUrl, requestBody, {
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 30000
+                timeout: 12000
               });
             } else {
               throw retryErr;

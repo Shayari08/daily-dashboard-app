@@ -637,9 +637,9 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint =
 
   if (cachedWorkingGeminiModel) return cachedWorkingGeminiModel;
 
-  const rawPref = (preferredModel || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  const rawPref = (preferredModel || 'gemini-3.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
   // Skip models known to be deprecated / unavailable to new users
-  const cleanPref = (rawPref === 'gemini-2.5-flash' || rawPref === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawPref;
+  const cleanPref = (rawPref === 'gemini-2.5-flash' || rawPref === 'gemini-1.5-flash') ? 'gemini-3.5-flash' : rawPref;
 
   try {
     const listRes = await axios.get(
@@ -651,8 +651,16 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint =
       Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
     );
 
-    // 1. Priority candidates - put gemini-3.8-flash first as advised by Google
-    const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+    // 1. Check if the exact requested model is supported
+    const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref || m.name.endsWith(`/${cleanPref}`));
+    if (exact) {
+      cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
+      console.log(`✓ Auto-resolved requested Gemini model: ${cachedWorkingGeminiModel}`);
+      return cachedWorkingGeminiModel;
+    }
+
+    // 2. Priority candidate matching (gemini-3.5-flash, gemini-3.8-flash, gemini-2.0-flash, etc.)
+    const priorityCandidates = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
     for (const cand of priorityCandidates) {
       const match = supported.find(m => m.name === `models/${cand}` || m.name === cand || m.name.endsWith(`/${cand}`));
       if (match) {
@@ -660,13 +668,6 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint =
         console.log(`✓ Auto-resolved working Gemini model: ${cachedWorkingGeminiModel}`);
         return cachedWorkingGeminiModel;
       }
-    }
-
-    // 2. Is preferredModel in the supported list?
-    const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
-    if (exact) {
-      cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
-      return cachedWorkingGeminiModel;
     }
 
     // 3. Fallback to first available generateContent model
@@ -686,12 +687,13 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint =
 async function generateAIResponse(userMessage, context, userId) {
   const rawGeminiApiKey = process.env.GEMINI_API_KEY;
   const geminiApiKey = rawGeminiApiKey ? rawGeminiApiKey.trim().replace(/^["']|["']$/g, '') : null;
-  const rawConfiguredGemini = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
-  const configuredGeminiModel = (rawConfiguredGemini === 'gemini-2.5-flash' || rawConfiguredGemini === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawConfiguredGemini;
+  const rawConfiguredGemini = (process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  const configuredGeminiModel = (rawConfiguredGemini === 'gemini-2.5-flash' || rawConfiguredGemini === 'gemini-1.5-flash') ? 'gemini-3.5-flash' : rawConfiguredGemini;
 
   const groqApiKey = process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.trim().replace(/^["']|["']$/g, '') : null;
-  const configuredGroqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const groqModel = configuredGroqModel === 'llama-3.1-70b-versatile' ? 'llama-3.3-70b-versatile' : configuredGroqModel;
+  const rawConfiguredGroq = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const cleanGroq = rawConfiguredGroq.trim().replace(/^["']|["']$/g, '');
+  const groqModel = (cleanGroq === 'llama-3.1-70b-versatile' || cleanGroq === 'llama3-70b-8192') ? 'llama-3.3-70b-versatile' : cleanGroq;
 
   const pendingTasks = context.recentTasks.filter(t => t.status === 'pending');
   const completedTasks = context.recentTasks.filter(t => t.status === 'completed');
@@ -768,7 +770,7 @@ How to show up:
       let targetModel = cachedWorkingGeminiModel || configuredGeminiModel;
       let response;
 
-      const postGemini = async (modelName) => {
+      const postGemini = async (modelName, timeoutMs = 12000) => {
         return axios.post(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`,
           {
@@ -776,25 +778,29 @@ How to show up:
             contents,
             generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
           },
-          { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+          { headers: { 'Content-Type': 'application/json' }, timeout: timeoutMs }
         );
       };
 
       try {
-        response = await postGemini(targetModel);
+        response = await postGemini(targetModel, 12000);
       } catch (firstErr) {
-        if (firstErr.response?.status === 404) {
-          const errMsg = firstErr.response?.data?.error?.message || '';
+        const isTimeout = firstErr.code === 'ECONNABORTED' || firstErr.message?.includes('timeout');
+        const isCapacity = firstErr.response?.status === 503;
+        const isNotFound = firstErr.response?.status === 404;
+
+        if (isNotFound || isCapacity || isTimeout) {
+          const errMsg = firstErr.response?.data?.error?.message || firstErr.message || '';
           const suggestedMatch = errMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
           const suggestedHint = suggestedMatch ? suggestedMatch[1] : null;
 
-          console.warn(`Gemini model '${targetModel}' returned 404 (${errMsg}). Resolving working model...`);
+          console.warn(`Gemini model '${targetModel}' failed (${isTimeout ? 'timeout' : firstErr.response?.status}). Resolving working model...`);
           cachedWorkingGeminiModel = null;
-          targetModel = await resolveWorkingGeminiModel(geminiApiKey, configuredGeminiModel, suggestedHint);
-          console.log(`Retrying Gemini generateContent with resolved model: '${targetModel}'`);
+          targetModel = await resolveWorkingGeminiModel(geminiApiKey, 'gemini-2.0-flash', suggestedHint);
+          console.log(`Retrying Gemini generateContent with model: '${targetModel}'`);
 
           try {
-            response = await postGemini(targetModel);
+            response = await postGemini(targetModel, 12000);
           } catch (retryErr) {
             const retryErrMsg = retryErr.response?.data?.error?.message || '';
             const retrySuggested = retryErrMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
@@ -802,7 +808,7 @@ How to show up:
               targetModel = retrySuggested[1];
               cachedWorkingGeminiModel = targetModel;
               console.log(`Retrying Gemini generateContent with recommended model from error: '${targetModel}'`);
-              response = await postGemini(targetModel);
+              response = await postGemini(targetModel, 12000);
             } else {
               throw retryErr;
             }
@@ -857,7 +863,7 @@ How to show up:
             'Authorization': `Bearer ${groqApiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 30000
+          timeout: 10000
         }
       );
 
@@ -868,16 +874,18 @@ How to show up:
     }
   }
 
-  // Method 2: Try general llmService (Ollama / HuggingFace / Fallback)
-  try {
-    const llmService = require('../services/llmService');
-    const prompt = `${systemPrompt}\n\nUser: ${userMessage}\nCompanion:`;
-    const serviceRes = await llmService.generateCompletion(prompt, { temperature: 0.8, max_tokens: 250 });
-    if (serviceRes && serviceRes.success && !serviceRes.fallback && serviceRes.text) {
-      return serviceRes.text.trim();
+  // Method 2: Try general llmService (Ollama / HuggingFace) - skip if Gemini already failed
+  if (!geminiApiKey) {
+    try {
+      const llmService = require('../services/llmService');
+      const prompt = `${systemPrompt}\n\nUser: ${userMessage}\nCompanion:`;
+      const serviceRes = await llmService.generateCompletion(prompt, { temperature: 0.8, max_tokens: 250 });
+      if (serviceRes && serviceRes.success && !serviceRes.fallback && serviceRes.text) {
+        return serviceRes.text.trim();
+      }
+    } catch (serviceErr) {
+      console.warn('llmService chat attempt failed:', serviceErr.message);
     }
-  } catch (serviceErr) {
-    console.warn('llmService chat attempt failed:', serviceErr.message);
   }
 
   // Method 3: Smart contextual fallback with randomized empathetic variety
