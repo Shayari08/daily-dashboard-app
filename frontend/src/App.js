@@ -14,12 +14,12 @@ function App() {
       <Router>
         <div className="App">
           <Routes>
-            {/* "/" sends new users to onboarding, returning users to their dashboard, signed-out visitors to login */}
-            <Route path="/" element={<PrivateRoute mode="app"><Navigate to="/dashboard" replace /></PrivateRoute>} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/onboarding" element={<PrivateRoute mode="onboarding"><Onboarding /></PrivateRoute>} />
-            <Route path="/dashboard" element={<PrivateRoute mode="app"><Dashboard /></PrivateRoute>} />
-            <Route path="/archive" element={<PrivateRoute mode="app"><Archive /></PrivateRoute>} />
+            <Route path="/onboarding" element={<PrivateRoute><Onboarding /></PrivateRoute>} />
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/archive" element={<PrivateRoute><Archive /></PrivateRoute>} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </Router>

@@ -15,6 +15,7 @@ const pool = require('../config/db');
 // GET /api/onboarding/status
 // ============================================
 router.get('/status', isAuthenticated, async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
     const result = await pool.query(
       'SELECT onboarding_completed FROM users WHERE id = $1',

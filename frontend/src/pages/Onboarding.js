@@ -43,26 +43,6 @@ function Onboarding() {
 
   const totalSteps = 4;
 
-  // Check if user already completed onboarding
-  useEffect(() => {
-    checkOnboardingStatus();
-  }, []);
-
-  const checkOnboardingStatus = async () => {
-    try {
-      const response = await axios.get('/api/onboarding/status', { withCredentials: true });
-      if (!response.data.needsOnboarding) {
-        // Already completed, redirect to dashboard
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      console.error('Error checking onboarding status:', error);
-      if (error.response?.status === 401) {
-        navigate('/login');
-      }
-    }
-  };
-
   const focusAreaOptions = [
     { id: 'health', label: 'Health & Fitness', icon: '🏃', color: '#10b981' },
     { id: 'career', label: 'Career & Learning', icon: '📚', color: '#f59e0b' },
@@ -104,26 +84,18 @@ function Onboarding() {
 
     try {
       // Mark onboarding as completed without generating tasks/habits
-      const response = await axios.post('/api/onboarding/complete', {
+      await axios.post('/api/onboarding/complete', {
         skipped: true
       }, { withCredentials: true });
-
-      if (response.data && response.data.success) {
-        navigate('/dashboard', { replace: true });
-      } else {
-        await axios.post('/api/onboarding/skip', {}, { withCredentials: true });
-        navigate('/dashboard', { replace: true });
-      }
     } catch (error) {
-      console.error('Error skipping onboarding via complete:', error);
+      console.warn('Error skipping onboarding via complete:', error);
       try {
         await axios.post('/api/onboarding/skip', {}, { withCredentials: true });
-        navigate('/dashboard', { replace: true });
       } catch (fallbackError) {
-        console.error('Error skipping onboarding via skip route:', fallbackError);
-        setError('Failed to skip onboarding. Please try again or refresh the page.');
-        setLoading(false);
+        console.warn('Error skipping onboarding via skip route:', fallbackError);
       }
+    } finally {
+      navigate('/dashboard', { replace: true });
     }
   };
 

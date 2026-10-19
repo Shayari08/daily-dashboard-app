@@ -3,24 +3,19 @@ import { Navigate } from 'react-router-dom';
 import axios from 'axios';
 
 /**
- * Decides where a visitor belongs before rendering a page.
- *
- *   not signed in                  -> /login
- *   signed in, onboarding not done -> /onboarding
- *   signed in, onboarding done     -> the requested page
- *
- * mode="app"        : pages for onboarded users (dashboard, archive, "/")
- * mode="onboarding" : the onboarding page itself (sends finished users to /dashboard)
+ * Protects routes requiring authentication.
+ * - If signed out (401), redirects to /login.
+ * - If authenticated, renders the requested page.
+ * - If server is waking up or unreachable, provides a retry button.
  */
-function PrivateRoute({ children, mode = 'app' }) {
-  const [status, setStatus] = useState('loading'); // loading | anonymous | needs-onboarding | ready | error
+function PrivateRoute({ children }) {
+  const [status, setStatus] = useState('loading'); // loading | authenticated | anonymous | error
 
-  const check = async () => {
+  const checkAuth = async () => {
     setStatus('loading');
     try {
       await axios.get('/api/auth/me', { withCredentials: true });
-      const { data } = await axios.get('/api/onboarding/status', { withCredentials: true });
-      setStatus(data.needsOnboarding ? 'needs-onboarding' : 'ready');
+      setStatus('authenticated');
     } catch (error) {
       // 401 = genuinely signed out. Anything else (timeout, server waking up) is NOT "signed out".
       setStatus(error.response?.status === 401 ? 'anonymous' : 'error');
@@ -28,7 +23,7 @@ function PrivateRoute({ children, mode = 'app' }) {
   };
 
   useEffect(() => {
-    check();
+    checkAuth();
   }, []);
 
   if (status === 'loading') {
@@ -52,17 +47,12 @@ function PrivateRoute({ children, mode = 'app' }) {
         minHeight: '100vh', flexDirection: 'column', gap: '1rem', textAlign: 'center', padding: '1rem'
       }}>
         <p>The server is waking up or unreachable. This can take up to a minute on the free tier.</p>
-        <button onClick={check}>Try again</button>
+        <button onClick={checkAuth}>Try again</button>
       </div>
     );
   }
 
-  if (mode === 'onboarding') {
-    return status === 'ready' ? <Navigate to="/dashboard" replace /> : children;
-  }
-
-  // mode === 'app'
-  return status === 'needs-onboarding' ? <Navigate to="/onboarding" replace /> : children;
+  return children;
 }
 
 export default PrivateRoute;

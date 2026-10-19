@@ -62,6 +62,40 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
+// Onboarding mock endpoints
+let mockOnboardingStatus = { needsOnboarding: true };
+
+app.get('/api/onboarding/status', (req, res) => {
+  console.log('✓ Onboarding status request');
+  res.json(mockOnboardingStatus);
+});
+
+app.post('/api/onboarding/complete', (req, res) => {
+  console.log('✓ Onboarding complete request (skipped:', !!req.body.skipped, ')');
+  mockOnboardingStatus = { needsOnboarding: false };
+  res.json({
+    success: true,
+    message: req.body.skipped ? 'Onboarding skipped' : 'Onboarding completed',
+    tasksCreated: 0,
+    habitsCreated: 0,
+    tasks: [],
+    habits: []
+  });
+});
+
+app.post('/api/onboarding/skip', (req, res) => {
+  console.log('✓ Onboarding skip request');
+  mockOnboardingStatus = { needsOnboarding: false };
+  res.json({
+    success: true,
+    message: 'Onboarding skipped successfully',
+    tasksCreated: 0,
+    habitsCreated: 0,
+    tasks: [],
+    habits: []
+  });
+});
+
 // Tasks endpoints
 app.get('/api/tasks', (req, res) => {
   console.log('✓ Get tasks request');
