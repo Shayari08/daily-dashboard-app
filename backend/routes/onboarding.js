@@ -549,9 +549,16 @@ async function fallbackGenerateInitialTasks(client, userId, goals, focusAreas, t
     }
   }
 
-  // Generate from text analysis — only tasks matching selected focus areas
+  // Everything below is "extra" suggestions on top of the user's own goals
+  // (keyword-matched text analysis + one starter per focus area). Both lists
+  // can each grow with how many categories/areas happen to match, so collect
+  // candidates first and cap the combined total instead of inserting
+  // everything unbounded.
+  const MAX_EXTRA_TASKS = 5;
+  const extraCandidates = [];
+
+  // From text analysis — only tasks matching selected focus areas
   if (textAnalysis && textAnalysis.suggestedTasks && textAnalysis.suggestedTasks.length > 0) {
-    // Filter: only include tasks whose category is in the selected focus areas
     const categoryForTask = {};
     if (textAnalysis.suggestedCategories) {
       for (const cat of textAnalysis.suggestedCategories) {
@@ -561,66 +568,48 @@ async function fallbackGenerateInitialTasks(client, userId, goals, focusAreas, t
       }
     }
 
-    // Only generate text-analysis tasks if at least one matching category exists
+    // Only include text-analysis tasks if at least one matching category exists
     if (Object.keys(categoryForTask).length > 0) {
       for (const taskTitle of textAnalysis.suggestedTasks) {
-        const result = await client.query(
-          `INSERT INTO tasks (user_id, title, description, status, created_by)
-           VALUES ($1, $2, $3, 'pending', 'ai')
-           RETURNING *`,
-          [userId, taskTitle, 'Generated from your goals']
-        );
-        tasks.push(result.rows[0]);
+        extraCandidates.push({ title: taskTitle, description: 'Generated from your goals', category: null });
       }
     }
   }
 
-  // Specific actionable daily tasks for selected focus areas (15-45 min, concrete verbs)
+  // One specific actionable daily task per selected focus area (15-45 min, concrete verbs)
   if (focusAreas && focusAreas.length > 0) {
     const focusAreaSpecificTasks = {
-      'health': [
-        { title: 'Do a 20-minute bodyweight workout or brisk walk', description: 'Quick physical activity session for today', category: 'Health & Fitness' },
-        { title: 'Drink 8 glasses of water throughout the day', description: 'Stay hydrated with a glass every 1-2 hours', category: 'Health & Fitness' }
-      ],
-      'career': [
-        { title: 'Complete 1 lesson or tutorial in your current course', description: 'Dedicated 30-minute study block', category: 'Career & Learning' },
-        { title: 'Read 15 pages of a professional or technical book', description: 'Focused learning reading session', category: 'Career & Learning' }
-      ],
-      'productivity': [
-        { title: 'Define top 3 priority tasks and tackle them first', description: 'Identify highest-impact items to do before midday', category: 'Productivity' },
-        { title: 'Organize workspace and clear desktop for 15 mins', description: 'Set up an uncluttered work environment', category: 'Productivity' }
-      ],
-      'finance': [
-        { title: 'Review bank transactions from the past 7 days', description: 'Log expenses and check recent account balances', category: 'Finance' },
-        { title: 'Audit monthly subscriptions and cancel any unused ones', description: 'Find and eliminate unwanted recurring charges', category: 'Finance' }
-      ],
-      'relationships': [
-        { title: 'Send a thoughtful message or call a close friend or family member', description: 'Meaningful 15-minute connection check-in', category: 'Relationships' }
-      ],
-      'creativity': [
-        { title: 'Spend 20 minutes sketching, writing, or brainstorming ideas', description: 'Free-form creative exploration session', category: 'Creativity' }
-      ],
-      'mindfulness': [
-        { title: 'Complete a 10-minute breathwork or meditation session', description: 'Calm and center yourself with quiet breathing', category: 'Mindfulness' },
-        { title: 'Write down 3 specific things you are grateful for today', description: 'Quick gratitude practice', category: 'Mindfulness' }
-      ]
+      'health': { title: 'Do a 20-minute bodyweight workout or brisk walk', description: 'Quick physical activity session for today', category: 'Health & Fitness' },
+      'career': { title: 'Complete 1 lesson or tutorial in your current course', description: 'Dedicated 30-minute study block', category: 'Career & Learning' },
+      'productivity': { title: 'Define top 3 priority tasks and tackle them first', description: 'Identify highest-impact items to do before midday', category: 'Productivity' },
+      'finance': { title: 'Review bank transactions from the past 7 days', description: 'Log expenses and check recent account balances', category: 'Finance' },
+      'relationships': { title: 'Send a thoughtful message or call a close friend or family member', description: 'Meaningful 15-minute connection check-in', category: 'Relationships' },
+      'creativity': { title: 'Spend 20 minutes sketching, writing, or brainstorming ideas', description: 'Free-form creative exploration session', category: 'Creativity' },
+      'mindfulness': { title: 'Complete a 10-minute breathwork or meditation session', description: 'Calm and center yourself with quiet breathing', category: 'Mindfulness' }
     };
 
     for (const area of focusAreas) {
-      const specificList = focusAreaSpecificTasks[area] || [
-        { title: `Complete a 30-minute focused action towards ${focusAreaToCategory[area] || area}`, description: 'Dedicated progress block for today', category: focusAreaToCategory[area] || 'General' }
-      ];
-
-      // Insert first specific task for each selected area
-      const taskDef = specificList[0];
-      const areaTask = await client.query(
-        `INSERT INTO tasks (user_id, title, description, category, status, created_by)
-         VALUES ($1, $2, $3, $4, 'pending', 'ai')
-         RETURNING *`,
-        [userId, taskDef.title, taskDef.description, taskDef.category]
-      );
-      tasks.push(areaTask.rows[0]);
+      const taskDef = focusAreaSpecificTasks[area] || {
+        title: `Complete a 30-minute focused action towards ${focusAreaToCategory[area] || area}`,
+        description: 'Dedicated progress block for today',
+        category: focusAreaToCategory[area] || 'General'
+      };
+      extraCandidates.push(taskDef);
     }
+  }
+
+  const seenTitles = new Set();
+  const dedupedExtras = extraCandidates.filter(t => (seenTitles.has(t.title) ? false : seenTitles.add(t.title)));
+  const selectedExtras = dedupedExtras.slice(0, MAX_EXTRA_TASKS);
+
+  for (const taskDef of selectedExtras) {
+    const result = await client.query(
+      `INSERT INTO tasks (user_id, title, description, category, status, created_by)
+       VALUES ($1, $2, $3, $4, 'pending', 'ai')
+       RETURNING *`,
+      [userId, taskDef.title, taskDef.description, taskDef.category]
+    );
+    tasks.push(result.rows[0]);
   }
 
   return tasks;
@@ -720,10 +709,47 @@ async function generateInitialHabits(client, userId, dailyRoutine, preferences, 
 // FUNCTION: Fallback habit generation
 // ============================================
 async function fallbackGenerateInitialHabits(client, userId, dailyRoutine, preferences, focusAreas, textAnalysis) {
-  const habits = [];
+  // Capped so picking several focus areas + both routines can't dump 15-20+
+  // generic habits on someone in one go — only the top MAX_HABITS survive,
+  // in priority order, with duplicate titles (e.g. "Daily Planning" showing
+  // up from two different buckets) collapsed to one.
+  const MAX_HABITS = 6;
 
-  // Helper to insert a habit as a recurring goal
-  const insertGoal = async (name, frequency) => {
+  // Each bucket contributes at most its first entry; priority order below
+  // is deliberate (routine anchors first, then focus-area habits).
+  const candidates = [];
+  const addBucket = (condition, entries) => {
+    if (condition) candidates.push(entries[0]);
+  };
+
+  addBucket(dailyRoutine?.morningRoutine, [
+    { name: '🌅 Morning Wake-up', frequency: 'daily' }
+  ]);
+  addBucket(preferences?.workStyle === 'focused' || focusAreas?.includes('productivity'), [
+    { name: '🎯 Deep Work Session', frequency: 'daily' }
+  ]);
+  addBucket(focusAreas?.includes('health'), [
+    { name: '🏃 Exercise', frequency: dailyRoutine?.exerciseFrequency || 'daily' }
+  ]);
+  addBucket(focusAreas?.includes('career'), [
+    { name: '📚 Study/Learn', frequency: 'daily' }
+  ]);
+  addBucket(dailyRoutine?.eveningRoutine, [
+    { name: '📓 Evening Reflection', frequency: 'daily' }
+  ]);
+  addBucket(preferences?.mindfulness || textAnalysis?.insights?.mindfulnessFocus, [
+    { name: '🧘 Meditation', frequency: 'daily' }
+  ]);
+  addBucket(textAnalysis?.insights?.timeManagement, [
+    { name: '📅 Daily Planning', frequency: 'daily' }
+  ]);
+
+  const seen = new Set();
+  const deduped = candidates.filter(c => (seen.has(c.name) ? false : seen.add(c.name)));
+  const selected = deduped.slice(0, MAX_HABITS);
+
+  const habits = [];
+  for (const { name, frequency } of selected) {
     const freq = frequency === 'daily' ? 'daily' : 'x_per_week';
     const timesPerWeek = frequency === 'daily' ? 7 : 1;
     const result = await client.query(
@@ -733,54 +759,6 @@ async function fallbackGenerateInitialHabits(client, userId, dailyRoutine, prefe
       [userId, name, freq, timesPerWeek]
     );
     habits.push(result.rows[0]);
-  };
-
-  // Morning routine habits
-  if (dailyRoutine?.morningRoutine) {
-    await insertGoal('🌅 Morning Wake-up', 'daily');
-    await insertGoal('💧 Drink Water', 'daily');
-    await insertGoal('🧘 Morning Meditation', 'daily');
-  }
-
-  // Work/productivity habits
-  if (preferences?.workStyle === 'focused' || focusAreas?.includes('productivity')) {
-    await insertGoal('🎯 Deep Work Session', 'daily');
-    await insertGoal('📝 Daily Planning', 'daily');
-    await insertGoal('🚫 Minimize Distractions', 'daily');
-  }
-
-  // Health & fitness habits
-  if (focusAreas?.includes('health')) {
-    await insertGoal('🏃 Exercise', dailyRoutine?.exerciseFrequency || 'daily');
-    await insertGoal('🥗 Eat Healthy Meal', 'daily');
-    await insertGoal('😴 Sleep On Time', 'daily');
-  }
-
-  // Learning habits
-  if (focusAreas?.includes('career')) {
-    await insertGoal('📚 Study/Learn', 'daily');
-    await insertGoal('📖 Read', 'daily');
-    await insertGoal('✍️ Practice Skills', 'daily');
-  }
-
-  // Evening routine habits
-  if (dailyRoutine?.eveningRoutine) {
-    await insertGoal('📓 Evening Reflection', 'daily');
-    await insertGoal('📱 No Screens Before Bed', 'daily');
-    await insertGoal('🛏️ Consistent Bedtime', 'daily');
-  }
-
-  // Mindfulness habits
-  if (preferences?.mindfulness || textAnalysis?.insights?.mindfulnessFocus) {
-    await insertGoal('🧘 Meditation', 'daily');
-    await insertGoal('🙏 Gratitude Practice', 'daily');
-    await insertGoal('✨ Positive Affirmations', 'daily');
-  }
-
-  // Habits from text analysis insights
-  if (textAnalysis?.insights?.timeManagement) {
-    await insertGoal('📅 Daily Planning', 'daily');
-    await insertGoal('🎯 Time Blocking', 'daily');
   }
 
   return habits;
