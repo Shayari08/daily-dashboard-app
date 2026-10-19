@@ -473,10 +473,10 @@ async function generateInitialTasks(client, userId, goals, focusAreas, textAnaly
       // Save AI-generated tasks to database
       for (const taskData of result.tasks) {
         const taskResult = await client.query(
-          `INSERT INTO tasks (user_id, title, description, status, created_by)
-           VALUES ($1, $2, $3, 'pending', 'ai')
+          `INSERT INTO tasks (user_id, title, description, category, status, created_by)
+           VALUES ($1, $2, $3, $4, 'pending', 'ai')
            RETURNING *`,
-          [userId, taskData.title, taskData.description]
+          [userId, taskData.title, taskData.description, taskData.category || null]
         );
         tasks.push(taskResult.rows[0]);
       }

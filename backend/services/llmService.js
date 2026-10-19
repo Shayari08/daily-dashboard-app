@@ -643,12 +643,32 @@ JSON array only:
       .map(g => `- ${g.title} (${g.frequency === 'daily' ? 'daily' : g.times_per_week + 'x/week'})`)
       .join('\n');
 
-    // Build progress picture: which areas have been worked on vs neglected
+    // Build progress picture: which areas have been worked on vs neglected.
+    // tasks.category holds whatever free-text label got saved at insert time
+    // ("Health & Fitness", a Gemini-invented string, or null) — never the bare
+    // focus-area id ("health") that's being compared against here, so this
+    // has to normalize both sides through the same keyword match the rest of
+    // this codebase already uses, or every area reads as permanently 0/neglected.
+    const normalizeToAreaId = (raw) => {
+      const s = (raw || '').toLowerCase();
+      if (s.includes('health') || s.includes('fitness')) return 'health';
+      if (s.includes('career') || s.includes('learning')) return 'career';
+      if (s.includes('product')) return 'productivity';
+      if (s.includes('relation')) return 'relationships';
+      if (s.includes('creativ')) return 'creativity';
+      if (s.includes('financ')) return 'finance';
+      if (s.includes('mindful')) return 'mindfulness';
+      return s;
+    };
+
     const progressMap = {};
-    (categoryProgress || []).forEach(row => { progressMap[row.category] = parseInt(row.completed_count); });
+    (categoryProgress || []).forEach(row => {
+      const key = normalizeToAreaId(row.category);
+      progressMap[key] = (progressMap[key] || 0) + parseInt(row.completed_count);
+    });
     const focusAreasArr = focusAreas || [];
     const progressLines = focusAreasArr.map(area => {
-      const count = progressMap[area] || 0;
+      const count = progressMap[normalizeToAreaId(area)] || 0;
       if (count === 0) return `- ${area}: NO tasks completed yet (NEGLECTED — high priority)`;
       if (count <= 2) return `- ${area}: ${count} task(s) completed in last 30 days (low engagement)`;
       if (count <= 6) return `- ${area}: ${count} tasks completed (moderate progress)`;
