@@ -95,16 +95,34 @@ function Onboarding() {
   };
 
   const handleSkip = async () => {
-    if (window.confirm('Skip onboarding? You can reset goals from the dashboard to redo this later.')) {
+    if (!window.confirm('Skip onboarding? You can reset goals from the dashboard to redo this later.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Mark onboarding as completed without generating tasks/habits
+      const response = await axios.post('/api/onboarding/complete', {
+        skipped: true
+      }, { withCredentials: true });
+
+      if (response.data && response.data.success) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        await axios.post('/api/onboarding/skip', {}, { withCredentials: true });
+        navigate('/dashboard', { replace: true });
+      }
+    } catch (error) {
+      console.error('Error skipping onboarding via complete:', error);
       try {
-        // Mark onboarding as completed without generating tasks/habits
-        await axios.post('/api/onboarding/complete', {
-          skipped: true
-        }, { withCredentials: true });
-        navigate('/dashboard');
-      } catch (error) {
-        console.error('Error skipping onboarding:', error);
-        navigate('/dashboard'); // Go to dashboard anyway
+        await axios.post('/api/onboarding/skip', {}, { withCredentials: true });
+        navigate('/dashboard', { replace: true });
+      } catch (fallbackError) {
+        console.error('Error skipping onboarding via skip route:', fallbackError);
+        setError('Failed to skip onboarding. Please try again or refresh the page.');
+        setLoading(false);
       }
     }
   };
@@ -518,6 +536,12 @@ function Onboarding() {
 
       {/* Main Content */}
       <div className="onboarding-content">
+        {error && currentStep !== 4 && (
+          <div className="error-card" style={{ marginBottom: '1.5rem' }}>
+            <span className="error-icon">⚠️</span>
+            <p>{error}</p>
+          </div>
+        )}
         {renderStep()}
       </div>
 
@@ -527,8 +551,9 @@ function Onboarding() {
           <button
             className="btn-secondary-onboarding"
             onClick={handleSkip}
+            disabled={loading || aiGenerating}
           >
-            Skip for now
+            {loading ? 'Skipping...' : 'Skip for now'}
           </button>
         </div>
 

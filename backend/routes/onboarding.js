@@ -22,11 +22,66 @@ router.get('/status', isAuthenticated, async (req, res) => {
     );
 
     res.json({
-      needsOnboarding: !result.rows[0].onboarding_completed
+      needsOnboarding: !result.rows[0]?.onboarding_completed
     });
   } catch (error) {
     console.error('Onboarding status error:', error);
     res.status(500).json({ error: 'Failed to check onboarding status' });
+  }
+});
+
+// ============================================
+// ROUTE: Skip onboarding
+// POST /api/onboarding/skip
+// ============================================
+router.post('/skip', isAuthenticated, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const onboardingData = {
+      skipped: true,
+      completedAt: new Date().toISOString()
+    };
+
+    await client.query(
+      `UPDATE users
+       SET onboarding_completed = true,
+           onboarding_data = $1
+       WHERE id = $2`,
+      [JSON.stringify(onboardingData), req.user.id]
+    );
+
+    await client.query('SAVEPOINT profile_skip_save');
+    try {
+      await client.query(
+        `INSERT INTO user_profiles (user_id, onboarding_completed, updated_at)
+         VALUES ($1, true, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id)
+         DO UPDATE SET onboarding_completed = true, updated_at = CURRENT_TIMESTAMP`,
+        [req.user.id]
+      );
+      await client.query('RELEASE SAVEPOINT profile_skip_save');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT profile_skip_save');
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Onboarding skipped successfully',
+      tasksCreated: 0,
+      habitsCreated: 0,
+      tasks: [],
+      habits: []
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Skip onboarding error:', error);
+    res.status(500).json({ error: 'Failed to skip onboarding' });
+  } finally {
+    client.release();
   }
 });
 
@@ -47,8 +102,51 @@ router.post('/complete', isAuthenticated, async (req, res) => {
       dailyRoutine,
       preferences,
       workStyle,
-      focusAreas
+      focusAreas,
+      specificMetrics,
+      skipped
     } = req.body;
+
+    // Handle skip request
+    if (skipped) {
+      const onboardingData = {
+        skipped: true,
+        completedAt: new Date().toISOString()
+      };
+
+      await client.query(
+        `UPDATE users
+         SET onboarding_completed = true,
+             onboarding_data = $1
+         WHERE id = $2`,
+        [JSON.stringify(onboardingData), req.user.id]
+      );
+
+      await client.query('SAVEPOINT profile_skip_save');
+      try {
+        await client.query(
+          `INSERT INTO user_profiles (user_id, onboarding_completed, updated_at)
+           VALUES ($1, true, CURRENT_TIMESTAMP)
+           ON CONFLICT (user_id)
+           DO UPDATE SET onboarding_completed = true, updated_at = CURRENT_TIMESTAMP`,
+          [req.user.id]
+        );
+        await client.query('RELEASE SAVEPOINT profile_skip_save');
+      } catch (e) {
+        await client.query('ROLLBACK TO SAVEPOINT profile_skip_save');
+      }
+
+      await client.query('COMMIT');
+
+      return res.json({
+        success: true,
+        message: 'Onboarding skipped successfully',
+        tasksCreated: 0,
+        habitsCreated: 0,
+        tasks: [],
+        habits: []
+      });
+    }
 
     // Analyze free-form text
     const textAnalysis = await analyzeGoalsText(goalsText);
@@ -114,7 +212,20 @@ router.post('/complete', isAuthenticated, async (req, res) => {
       }
     }
 
-    // Generate tasks and habits (non-fatal — onboarding completes even if generation fails)
+    // Update user_profiles onboarding_completed flag
+    await client.query('SAVEPOINT user_profiles_save');
+    try {
+      await client.query(
+        `INSERT INTO user_profiles (user_id, onboarding_completed, updated_at)
+         VALUES ($1, true, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id)
+         DO UPDATE SET onboarding_completed = true, updated_at = CURRENT_TIMESTAMP`,
+        [req.user.id]
+      );
+      await client.query('RELEASE SAVEPOINT user_profiles_save');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT user_profiles_save');
+    }
     let tasksCreated = [];
     let habitsCreated = [];
 
