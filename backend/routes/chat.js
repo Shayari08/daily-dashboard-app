@@ -629,10 +629,17 @@ router.delete('/history', isAuthenticated, async (req, res) => {
 
 let cachedWorkingGeminiModel = null;
 
-async function resolveWorkingGeminiModel(apiKey, preferredModel) {
+async function resolveWorkingGeminiModel(apiKey, preferredModel, suggestedHint = null) {
+  if (suggestedHint) {
+    cachedWorkingGeminiModel = suggestedHint.replace(/^models\//, '').trim();
+    return cachedWorkingGeminiModel;
+  }
+
   if (cachedWorkingGeminiModel) return cachedWorkingGeminiModel;
 
-  const cleanPref = (preferredModel || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  const rawPref = (preferredModel || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  // Skip models known to be deprecated / unavailable to new users
+  const cleanPref = (rawPref === 'gemini-2.5-flash' || rawPref === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawPref;
 
   try {
     const listRes = await axios.get(
@@ -644,22 +651,22 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel) {
       Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
     );
 
-    // 1. Is preferredModel in the supported list?
-    const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
-    if (exact) {
-      cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
-      return cachedWorkingGeminiModel;
-    }
-
-    // 2. Try known popular candidates in priority order
-    const priorityCandidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-pro'];
+    // 1. Priority candidates - put gemini-3.8-flash first as advised by Google
+    const priorityCandidates = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
     for (const cand of priorityCandidates) {
-      const match = supported.find(m => m.name.includes(cand));
+      const match = supported.find(m => m.name === `models/${cand}` || m.name === cand || m.name.endsWith(`/${cand}`));
       if (match) {
         cachedWorkingGeminiModel = match.name.replace(/^models\//, '');
         console.log(`✓ Auto-resolved working Gemini model: ${cachedWorkingGeminiModel}`);
         return cachedWorkingGeminiModel;
       }
+    }
+
+    // 2. Is preferredModel in the supported list?
+    const exact = supported.find(m => m.name === `models/${cleanPref}` || m.name === cleanPref);
+    if (exact) {
+      cachedWorkingGeminiModel = exact.name.replace(/^models\//, '');
+      return cachedWorkingGeminiModel;
     }
 
     // 3. Fallback to first available generateContent model
@@ -679,7 +686,8 @@ async function resolveWorkingGeminiModel(apiKey, preferredModel) {
 async function generateAIResponse(userMessage, context, userId) {
   const rawGeminiApiKey = process.env.GEMINI_API_KEY;
   const geminiApiKey = rawGeminiApiKey ? rawGeminiApiKey.trim().replace(/^["']|["']$/g, '') : null;
-  const configuredGeminiModel = (process.env.GEMINI_MODEL || 'gemini-1.5-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  const rawConfiguredGemini = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim().replace(/^["']|["']$/g, '').replace(/^models\//, '');
+  const configuredGeminiModel = (rawConfiguredGemini === 'gemini-2.5-flash' || rawConfiguredGemini === 'gemini-1.5-flash') ? 'gemini-3.8-flash' : rawConfiguredGemini;
 
   const groqApiKey = process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.trim().replace(/^["']|["']$/g, '') : null;
   const configuredGroqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
@@ -772,20 +780,45 @@ How to show up:
         );
       } catch (firstErr) {
         if (firstErr.response?.status === 404) {
-          console.warn(`Gemini model '${targetModel}' returned 404. Resolving working model...`);
+          const errMsg = firstErr.response?.data?.error?.message || '';
+          const suggestedMatch = errMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
+          const suggestedHint = suggestedMatch ? suggestedMatch[1] : null;
+
+          console.warn(`Gemini model '${targetModel}' returned 404 (${errMsg}). Resolving working model...`);
           cachedWorkingGeminiModel = null;
-          targetModel = await resolveWorkingGeminiModel(geminiApiKey, configuredGeminiModel);
+          targetModel = await resolveWorkingGeminiModel(geminiApiKey, configuredGeminiModel, suggestedHint);
           console.log(`Retrying Gemini generateContent with resolved model: '${targetModel}'`);
 
-          response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
-            {
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents,
-              generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
-            },
-            { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
-          );
+          try {
+            response = await axios.post(
+              `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
+              {
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents,
+                generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
+              },
+              { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+            );
+          } catch (retryErr) {
+            const retryErrMsg = retryErr.response?.data?.error?.message || '';
+            const retrySuggested = retryErrMsg.match(/models\/([a-zA-Z0-9_.-]+)/);
+            if (retrySuggested && retrySuggested[1] && retrySuggested[1] !== targetModel) {
+              targetModel = retrySuggested[1];
+              cachedWorkingGeminiModel = targetModel;
+              console.log(`Retrying Gemini generateContent with recommended model from error: '${targetModel}'`);
+              response = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`,
+                {
+                  systemInstruction: { parts: [{ text: systemPrompt }] },
+                  contents,
+                  generationConfig: { temperature: 0.85, maxOutputTokens: 300 }
+                },
+                { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+              );
+            } else {
+              throw retryErr;
+            }
+          }
         } else {
           throw firstErr;
         }

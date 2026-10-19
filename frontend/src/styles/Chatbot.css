@@ -202,6 +202,41 @@
   text-align: right;
 }
 
+/* Typing animation */
+.typing-warm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.85rem 1.1rem;
+}
+
+.typing-warm span {
+  width: 6px;
+  height: 6px;
+  background-color: var(--text-muted);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-warm span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-warm span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* Quick Actions */
 .chat-quick-actions {
   display: flex;

@@ -8,6 +8,36 @@ I'm not just a task manager — think of me as someone sitting with you while yo
 
 What's going on today?`;
 
+function formatInlineText(text) {
+  if (!text) return text;
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+      return <em key={index} style={{ opacity: 0.88 }}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      return (
+        <code
+          key={index}
+          style={{
+            background: 'var(--bg-surface-hover)',
+            padding: '0.15rem 0.35rem',
+            borderRadius: '4px',
+            fontSize: '0.85em',
+            border: '1px solid var(--border-subtle)'
+          }}
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
 function Chatbot({ onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -140,10 +170,10 @@ function Chatbot({ onClose }) {
             <div className="message-icon-warm">
               {msg.role === 'user' ? '👤' : '🌿'}
             </div>
-            <div className="message-content-warm">
+            <div className="message-bubble-warm message-content-warm">
               {msg.content.split('\n').map((line, i) => (
                 <React.Fragment key={i}>
-                  {line}
+                  {formatInlineText(line)}
                   {i < msg.content.split('\n').length - 1 && <br />}
                 </React.Fragment>
               ))}
@@ -154,28 +184,30 @@ function Chatbot({ onClose }) {
         {loading && (
           <div className="message-warm assistant">
             <div className="message-icon-warm">🌿</div>
-            <div className="message-content-warm typing-warm">
-              <span></span>
-              <span></span>
-              <span></span>
+            <div className="message-bubble-warm message-content-warm">
+              <div className="typing-warm">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSend} className="chatbot-input-warm">
+      <form onSubmit={handleSend} className="chatbot-input-form-warm chatbot-input-warm">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type your message..."
           disabled={loading}
-          className="chat-input-field"
+          className="chat-input-warm chat-input-field"
         />
         <button 
           type="submit" 
           disabled={loading || !input.trim()}
-          className="chat-send-btn"
+          className="btn-send-chat chat-send-btn"
         >
           {loading ? '⏳' : '➤'}
         </button>
