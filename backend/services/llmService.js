@@ -2,7 +2,11 @@ const axios = require('axios');
 
 class LLMService {
   constructor() {
-    this.provider = process.env.LLM_PROVIDER || (process.env.GROQ_API_KEY ? 'groq' : 'ollama'); // 'ollama' or 'huggingface' or 'groq'
+    this.geminiApiKey = process.env.GEMINI_API_KEY;
+    const configuredGeminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    this.geminiModel = configuredGeminiModel.replace(/^models\//, '');
+
+    this.provider = process.env.LLM_PROVIDER || (this.geminiApiKey ? 'gemini' : (process.env.GROQ_API_KEY ? 'groq' : 'ollama')); // 'gemini' or 'groq' or 'huggingface' or 'ollama'
     this.ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
     this.model = process.env.LLM_MODEL || 'llama3';
     this.hfToken = process.env.HUGGINGFACE_API_KEY;
@@ -10,7 +14,7 @@ class LLMService {
     this.fallbackEnabled = process.env.ENABLE_FALLBACK === 'true';
 
     // Onboarding-specific provider (can be different from main provider)
-    this.onboardingProvider = process.env.ONBOARDING_LLM_PROVIDER || (process.env.GROQ_API_KEY ? 'groq' : 'ollama');
+    this.onboardingProvider = process.env.ONBOARDING_LLM_PROVIDER || (this.geminiApiKey ? 'gemini' : (process.env.GROQ_API_KEY ? 'groq' : 'ollama'));
     this.groqApiKey = process.env.GROQ_API_KEY;
     // Normalize deprecated 70b model name if set in legacy config
     const configuredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -18,7 +22,9 @@ class LLMService {
   }
 
   async generateCompletion(prompt, options = {}) {
-    if (this.provider === 'groq') {
+    if (this.provider === 'gemini') {
+      return this.generateGeminiCompletion(prompt, options);
+    } else if (this.provider === 'groq') {
       return this.generateGroqCompletion(prompt, options);
     } else if (this.provider === 'huggingface') {
       return this.generateHuggingFaceCompletion(prompt, options);
@@ -33,12 +39,76 @@ class LLMService {
       max_tokens: options.max_tokens || 800
     };
 
-    if (this.onboardingProvider === 'groq') {
+    if (this.onboardingProvider === 'gemini') {
+      return this.generateGeminiCompletion(prompt, onboardingOptions);
+    } else if (this.onboardingProvider === 'groq') {
       return this.generateGroqCompletion(prompt, onboardingOptions);
     } else if (this.onboardingProvider === 'huggingface') {
       return this.generateHuggingFaceCompletion(prompt, onboardingOptions);
     } else {
       return this.generateOllamaCompletion(prompt, onboardingOptions);
+    }
+  }
+
+  async generateGeminiCompletion(prompt, options = {}) {
+    if (!this.geminiApiKey) {
+      console.warn('Gemini API key not provided, using fallback');
+      return this.fallbackResponse();
+    }
+
+    try {
+      const cleanModel = (this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${this.geminiApiKey}`;
+
+      const requestBody = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: options.temperature || 0.7,
+          maxOutputTokens: options.max_tokens || 1024
+        }
+      };
+
+      if (options.system) {
+        requestBody.systemInstruction = {
+          parts: [{ text: options.system }]
+        };
+      }
+
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      const text = response.data?.candidates?.[0]?.content?.parts
+        ?.map(p => p.text)
+        .join('')
+        ?.trim() || '';
+
+      return {
+        success: true,
+        text: text,
+        model: cleanModel
+      };
+    } catch (error) {
+      console.error('Gemini generation error:', error.message);
+      if (error.response?.data) console.error('Response:', JSON.stringify(error.response.data));
+
+      if (this.fallbackEnabled) {
+        return this.fallbackResponse();
+      }
+
+      return {
+        success: false,
+        error: error.message,
+        fallback: false
+      };
     }
   }
 

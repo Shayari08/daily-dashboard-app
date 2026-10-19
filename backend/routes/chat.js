@@ -612,10 +612,14 @@ router.delete('/history', isAuthenticated, async (req, res) => {
 });
 
 // ================================================
-// AI Response Generator — Groq-powered companion
+// AI Response Generator — Gemini-powered companion
 // ================================================
 
 async function generateAIResponse(userMessage, context, userId) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const configuredGeminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const geminiModel = configuredGeminiModel.replace(/^models\//, '');
+
   const groqApiKey = process.env.GROQ_API_KEY;
   const configuredGroqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   const groqModel = configuredGroqModel === 'llama-3.1-70b-versatile' ? 'llama-3.3-70b-versatile' : configuredGroqModel;
@@ -651,8 +655,84 @@ How to show up:
 - Never lecture, never unsolicited advice, never list things unless asked
 - Sound like a real person, not a bot`;
 
-  // Method 1: Try Direct Groq if API key is present
-  if (groqApiKey) {
+  // Method 1: Try Direct Gemini if API key is present
+  if (geminiApiKey) {
+    try {
+      const historyResult = await pool.query(
+        `SELECT role, content FROM chat_messages
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 8`,
+        [userId]
+      );
+      const recentHistory = historyResult.rows.reverse();
+
+      const contents = [];
+      for (const msg of recentHistory) {
+        const role = msg.role === 'assistant' ? 'model' : 'user';
+        const text = (msg.content || '').trim();
+        if (!text) continue;
+
+        if (contents.length > 0 && contents[contents.length - 1].role === role) {
+          contents[contents.length - 1].parts[0].text += `\n${text}`;
+        } else {
+          contents.push({
+            role,
+            parts: [{ text }]
+          });
+        }
+      }
+
+      // Ensure history starts with user turn
+      while (contents.length > 0 && contents[0].role !== 'user') {
+        contents.shift();
+      }
+
+      // Append current user message
+      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+        contents[contents.length - 1].parts[0].text += `\n${userMessage}`;
+      } else {
+        contents.push({
+          role: 'user',
+          parts: [{ text: userMessage }]
+        });
+      }
+
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+        {
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          contents,
+          generationConfig: {
+            temperature: 0.85,
+            maxOutputTokens: 300
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      );
+
+      const generated = response.data?.candidates?.[0]?.content?.parts
+        ?.map(p => p.text)
+        .join('')
+        ?.trim();
+      if (generated) return generated;
+    } catch (geminiError) {
+      console.warn('Direct Gemini chat attempt failed, trying fallback:', geminiError.message);
+      if (geminiError.response?.data) {
+        console.warn('Gemini response data:', JSON.stringify(geminiError.response.data));
+      }
+    }
+  }
+
+  // Method 1b: Try Direct Groq if Gemini is not set and Groq API key is present
+  if (groqApiKey && !geminiApiKey) {
     try {
       const historyResult = await pool.query(
         `SELECT role, content FROM chat_messages
