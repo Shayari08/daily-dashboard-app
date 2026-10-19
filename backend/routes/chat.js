@@ -400,8 +400,20 @@ async function parseAndExecuteCommand(message, userId, context) {
   }
 
   // Command 10: List / Show tasks
-  if (messageLower.match(/^(?:what (?:are my|tasks (?:do i have|are)|tasks for)|show (?:my )?tasks|list (?:my )?tasks|my tasks|tasks today|today'?s? tasks|what should i (?:work on|do)(?: today)?)$/i) ||
-      messageLower.includes('what tasks do i have') || messageLower === 'tasks' || messageLower === 'show tasks') {
+  const isShowTasksCommand = (
+    messageLower.match(/^(?:what (?:are|is) (?:my )?tasks?(?: for today| today)?|what tasks? (?:do i have|are there)(?: today)?|show (?:my )?tasks?|list (?:my )?tasks?|my tasks?|tasks? today|today'?s? tasks?|what should i (?:work on|do)(?: today)?|what do i (?:have|need) to do(?: today)?)$/i) ||
+    messageLower.includes('what are my tasks') ||
+    messageLower.includes('what tasks do i have') ||
+    messageLower.includes('tasks for today') ||
+    messageLower.includes('show my tasks') ||
+    messageLower.includes('list my tasks') ||
+    messageLower === 'tasks' ||
+    messageLower === 'show tasks' ||
+    messageLower === 'list tasks' ||
+    messageLower === 'my tasks'
+  );
+
+  if (isShowTasksCommand) {
     try {
       const result = await pool.query(
         `SELECT id, title, description, estimated_duration, priority, energy_required
@@ -662,13 +674,14 @@ How to show up:
         `SELECT role, content FROM chat_messages
          WHERE user_id = $1
          ORDER BY created_at DESC
+         OFFSET 1
          LIMIT 8`,
         [userId]
       );
-      const recentHistory = historyResult.rows.reverse();
+      const previousHistory = historyResult.rows.reverse();
 
       const contents = [];
-      for (const msg of recentHistory) {
+      for (const msg of previousHistory) {
         const role = msg.role === 'assistant' ? 'model' : 'user';
         const text = (msg.content || '').trim();
         if (!text) continue;
@@ -689,14 +702,10 @@ How to show up:
       }
 
       // Append current user message
-      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-        contents[contents.length - 1].parts[0].text += `\n${userMessage}`;
-      } else {
-        contents.push({
-          role: 'user',
-          parts: [{ text: userMessage }]
-        });
-      }
+      contents.push({
+        role: 'user',
+        parts: [{ text: userMessage }]
+      });
 
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
@@ -738,6 +747,7 @@ How to show up:
         `SELECT role, content FROM chat_messages
          WHERE user_id = $1
          ORDER BY created_at DESC
+         OFFSET 1
          LIMIT 8`,
         [userId]
       );
